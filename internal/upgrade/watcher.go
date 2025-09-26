@@ -117,9 +117,21 @@ func (fw *FileWatcher) checkForUpdate() bool {
 		return false
 	}
 
+	// If no upgrade info found (file doesn't exist), no update
+	if info == nil {
+		return false
+	}
+
 	// Check if this is a new upgrade
-	if fw.currentInfo == nil ||
-		info.Name != fw.currentInfo.Name ||
+	if fw.currentInfo == nil {
+		// First upgrade detected
+		fw.currentInfo = info
+		fw.needsUpdate = true
+		return true
+	}
+
+	// Check if upgrade has changed
+	if info.Name != fw.currentInfo.Name ||
 		info.Height != fw.currentInfo.Height {
 		fw.currentInfo = info
 		fw.needsUpdate = true
