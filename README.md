@@ -8,22 +8,28 @@ Wemixvisor is inspired by Cosmos SDK's Cosmovisor and adapted specifically for W
 
 ## Features
 
-### Current (v0.1.0)
-- ✅ Automatic binary upgrade detection
-- ✅ Process lifecycle management
-- ✅ File-based upgrade monitoring
-- ✅ Symbolic link-based version switching
-- ✅ Signal handling (SIGTERM, SIGINT, SIGQUIT)
-- ✅ Configurable polling intervals
-- ✅ Environment variable configuration
+### Phase 1: MVP (v0.1.0) - Complete
+- Automatic binary upgrade detection
+- Process lifecycle management
+- File-based upgrade monitoring
+- Symbolic link-based version switching
+- Signal handling (SIGTERM, SIGINT, SIGQUIT)
+- Configurable polling intervals
+- Environment variable configuration
 
-### Planned
-- Data backup before upgrades (v0.2.0)
-- Pre-upgrade hooks and validation (v0.2.0)
-- Graceful shutdown with timeout (v0.2.0)
-- WBFT consensus state monitoring (v0.3.0)
-- Automatic binary downloads (v0.3.0)
-- Batch upgrade support (v0.3.0)
+### Phase 2: Core Features (v0.2.0) - Complete
+- Data backup before upgrades
+- Pre-upgrade hooks and validation
+- Graceful shutdown with timeout
+- Backup restoration on failure
+- Custom pre-upgrade scripts
+- Enhanced error handling
+
+### Phase 3: Advanced Features (v0.3.0) - Planned
+- WBFT consensus state monitoring
+- Automatic binary downloads with checksum
+- Batch upgrade support
+- Network-wide coordination
 
 ## Installation
 
@@ -68,8 +74,13 @@ wemixvisor run start
 | `DAEMON_HOME` | `$HOME/.wemixd` | Home directory for the daemon |
 | `DAEMON_NAME` | `wemixd` | Name of the daemon binary |
 | `DAEMON_RESTART_AFTER_UPGRADE` | `true` | Restart after upgrade |
+| `DAEMON_RESTART_DELAY` | `0` | Delay before restart |
 | `DAEMON_POLL_INTERVAL` | `300ms` | Interval for checking upgrades |
-| `DAEMON_SHUTDOWN_GRACE` | `0` | Grace period for shutdown |
+| `DAEMON_SHUTDOWN_GRACE` | `30s` | Grace period for shutdown |
+| `DAEMON_DATA_BACKUP_DIR` | `$DAEMON_HOME/backups` | Backup directory |
+| `UNSAFE_SKIP_BACKUP` | `false` | Skip backup creation |
+| `DAEMON_PREUPGRADE_MAX_RETRIES` | `0` | Pre-upgrade script retry attempts |
+| `COSMOVISOR_CUSTOM_PREUPGRADE` | - | Custom pre-upgrade script path |
 | `DAEMON_RPC_ADDRESS` | `localhost:8545` | RPC address for WBFT node |
 
 ### Directory Structure

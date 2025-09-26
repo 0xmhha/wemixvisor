@@ -10,7 +10,9 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/wemix/wemixvisor/internal/backup"
 	"github.com/wemix/wemixvisor/internal/config"
+	"github.com/wemix/wemixvisor/internal/hooks"
 	"github.com/wemix/wemixvisor/internal/upgrade"
 	"github.com/wemix/wemixvisor/pkg/logger"
 	"github.com/wemix/wemixvisor/pkg/types"
@@ -22,6 +24,8 @@ type Manager struct {
 	cfg         *config.Config
 	logger      *logger.Logger
 	watcher     *upgrade.FileWatcher
+	backup      *backup.Manager
+	preHook     *hooks.PreUpgradeHook
 	cmd         *exec.Cmd
 	mu          sync.Mutex
 	running     bool
@@ -35,6 +39,8 @@ func NewManager(cfg *config.Config, logger *logger.Logger) *Manager {
 		cfg:         cfg,
 		logger:      logger,
 		watcher:     upgrade.NewFileWatcher(cfg, logger),
+		backup:      backup.NewManager(cfg, logger),
+		preHook:     hooks.NewPreUpgradeHook(cfg, logger),
 		stopChan:    make(chan struct{}),
 		stoppedChan: make(chan struct{}),
 	}
@@ -264,7 +270,37 @@ func (m *Manager) performUpgrade(info *types.UpgradeInfo) error {
 		zap.String("name", info.Name),
 		zap.Int64("height", info.Height))
 
-	// Verify upgrade binary exists
+	// Step 1: Validate the upgrade
+	if err := m.preHook.ValidateUpgrade(info); err != nil {
+		return fmt.Errorf("upgrade validation failed: %w", err)
+	}
+
+	// Step 2: Create backup before upgrade
+	backupPath, err := m.backup.CreateBackup(fmt.Sprintf("pre-upgrade-%s", info.Name))
+	if err != nil {
+		m.logger.Error("backup failed", zap.Error(err))
+		if !m.cfg.UnsafeSkipBackup {
+			return fmt.Errorf("backup failed and unsafe_skip_backup is false: %w", err)
+		}
+		m.logger.Warn("continuing upgrade without backup (unsafe_skip_backup=true)")
+	} else if backupPath != "" {
+		m.logger.Info("backup created", zap.String("path", backupPath))
+	}
+
+	// Step 3: Run pre-upgrade hook
+	if err := m.preHook.Execute(info); err != nil {
+		m.logger.Error("pre-upgrade hook failed", zap.Error(err))
+		// Attempt to restore backup if hook fails
+		if backupPath != "" {
+			m.logger.Info("attempting to restore backup after hook failure")
+			if restoreErr := m.backup.RestoreBackup(backupPath); restoreErr != nil {
+				m.logger.Error("backup restore failed", zap.Error(restoreErr))
+			}
+		}
+		return fmt.Errorf("pre-upgrade hook failed: %w", err)
+	}
+
+	// Step 4: Verify upgrade binary exists
 	upgradeBin := m.cfg.UpgradeBin(info.Name)
 	if _, err := os.Stat(upgradeBin); err != nil {
 		if !m.cfg.AllowDownloadBinaries {
@@ -274,9 +310,22 @@ func (m *Manager) performUpgrade(info *types.UpgradeInfo) error {
 		return fmt.Errorf("binary download not yet implemented")
 	}
 
-	// Update the symlink
+	// Step 5: Update the symlink
 	if err := m.cfg.SetCurrentUpgrade(info.Name); err != nil {
+		// Attempt to restore backup if symlink update fails
+		if backupPath != "" {
+			m.logger.Info("attempting to restore backup after symlink failure")
+			if restoreErr := m.backup.RestoreBackup(backupPath); restoreErr != nil {
+				m.logger.Error("backup restore failed", zap.Error(restoreErr))
+			}
+		}
 		return fmt.Errorf("failed to update symlink: %w", err)
+	}
+
+	// Step 6: Clean old backups (optional)
+	if err := m.backup.CleanOldBackups(7 * 24 * time.Hour); err != nil {
+		m.logger.Warn("failed to clean old backups", zap.Error(err))
+		// Non-critical error, continue
 	}
 
 	m.logger.Info("upgrade completed successfully",
