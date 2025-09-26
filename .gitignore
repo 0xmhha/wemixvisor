@@ -71,3 +71,6 @@ data/
 # Documentation build
 docs/_build/
 docs/.doctrees/
+
+# Development guidelines (local only)
+CLAUDE.md

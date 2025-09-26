@@ -184,7 +184,7 @@ wemixvisor/
 
 ## Contributing
 
-Please read [CLAUDE.md](./CLAUDE.md) for development guidelines.
+Contributions are welcome! Please ensure your code follows Go best practices and includes appropriate tests.
 
 ## License
 
