@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2024-12-26
+
+### Added
+- Data backup functionality before upgrades
+- Pre-upgrade hook system for validation and preparation
+- Graceful shutdown with configurable timeout
+- Backup restoration on upgrade failure
+- Custom pre-upgrade script support
+- Automatic old backup cleanup
+- Enhanced error handling and recovery
+
+### Features
+- Create tar.gz backups of data directory
+- Run custom or standard pre-upgrade scripts
+- Validate upgrade binaries before execution
+- SIGTERM/SIGQUIT/SIGKILL signal handling
+- Configurable shutdown grace period
+- Retry mechanism for pre-upgrade scripts
+- Environment variable passing to scripts
+
+### Improved
+- Process shutdown sequence with thread dumps
+- Error recovery with automatic backup restore
+- Upgrade workflow with validation steps
+
 ## [0.1.0] - 2024-12-26
 
 ### Added
