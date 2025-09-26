@@ -168,7 +168,7 @@ func TestValidate(t *testing.T) {
 				PollInterval: 50 * time.Millisecond,
 			},
 			shouldErr: true,
-			errMsg:    "poll interval too short",
+			errMsg:    "poll interval too short (minimum 100ms)",
 		},
 	}
 
