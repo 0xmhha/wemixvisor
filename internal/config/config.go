@@ -37,6 +37,10 @@ type Config struct {
 	ValidatorMode   bool   `mapstructure:"validator_mode"`
 	DisableRecase   bool   `mapstructure:"cosmovisor_disable_recase"`
 
+	// Download settings
+	DownloadURLs       map[string]string `mapstructure:"download_urls"`
+	UnsafeSkipChecksum bool              `mapstructure:"unsafe_skip_checksum"`
+
 	// Logging
 	DisableLogs     bool   `mapstructure:"cosmovisor_disable_logs"`
 	ColorLogs       bool   `mapstructure:"cosmovisor_color_logs"`

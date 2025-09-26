@@ -12,6 +12,7 @@ import (
 
 	"github.com/wemix/wemixvisor/internal/backup"
 	"github.com/wemix/wemixvisor/internal/config"
+	"github.com/wemix/wemixvisor/internal/download"
 	"github.com/wemix/wemixvisor/internal/hooks"
 	"github.com/wemix/wemixvisor/internal/upgrade"
 	"github.com/wemix/wemixvisor/pkg/logger"
@@ -26,6 +27,7 @@ type Manager struct {
 	watcher     *upgrade.FileWatcher
 	backup      *backup.Manager
 	preHook     *hooks.PreUpgradeHook
+	downloader  *download.Downloader
 	cmd         *exec.Cmd
 	mu          sync.Mutex
 	running     bool
@@ -41,6 +43,7 @@ func NewManager(cfg *config.Config, logger *logger.Logger) *Manager {
 		watcher:     upgrade.NewFileWatcher(cfg, logger),
 		backup:      backup.NewManager(cfg, logger),
 		preHook:     hooks.NewPreUpgradeHook(cfg, logger),
+		downloader:  download.NewDownloader(cfg, logger),
 		stopChan:    make(chan struct{}),
 		stoppedChan: make(chan struct{}),
 	}
@@ -300,14 +303,16 @@ func (m *Manager) performUpgrade(info *types.UpgradeInfo) error {
 		return fmt.Errorf("pre-upgrade hook failed: %w", err)
 	}
 
-	// Step 4: Verify upgrade binary exists
-	upgradeBin := m.cfg.UpgradeBin(info.Name)
-	if _, err := os.Stat(upgradeBin); err != nil {
-		if !m.cfg.AllowDownloadBinaries {
-			return fmt.Errorf("upgrade binary not found and auto-download disabled: %w", err)
+	// Step 4: Ensure upgrade binary exists (download if necessary)
+	if err := m.downloader.EnsureUpgradeBinary(info.Name); err != nil {
+		// Attempt to restore backup if binary download fails
+		if backupPath != "" {
+			m.logger.Info("attempting to restore backup after download failure")
+			if restoreErr := m.backup.RestoreBackup(backupPath); restoreErr != nil {
+				m.logger.Error("backup restore failed", zap.Error(restoreErr))
+			}
 		}
-		// TODO: Implement binary download
-		return fmt.Errorf("binary download not yet implemented")
+		return fmt.Errorf("failed to ensure upgrade binary: %w", err)
 	}
 
 	// Step 5: Update the symlink

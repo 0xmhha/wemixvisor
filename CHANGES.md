@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2025-09-26
+
+### Added
+- Automatic binary download with checksum verification
+- Batch upgrade support for multiple scheduled upgrades
+- WBFT consensus integration for coordinated upgrades
+- Validator-specific upgrade coordination
+- Height-based upgrade scheduling
+- Progress reporting for downloads
+- Upgrade plan management system
+
+### Features
+- Download binaries from configured URLs with SHA256/SHA512 verification
+- Create and manage batch upgrade plans with multiple upgrades
+- Monitor consensus state and coordinate upgrades with WBFT
+- Wait for specific block heights before triggering upgrades
+- Support validator participation in consensus during upgrades
+- Track upgrade plan progress and status
+- Retry mechanism for failed downloads
+
+### Improved
+- Integration with process manager for automatic downloads
+- Comprehensive error handling and recovery
+- Validator mode support with consensus awareness
+
 ## [0.2.0] - 2025-09-26
 
 ### Added
@@ -47,21 +72,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Monitor upgrade-info.json file
 - Switch between binary versions using symbolic links
 - Basic signal handling (SIGTERM, SIGINT)
-
-## [0.2.0] - TBD
-
-### Planned
-- Data backup functionality
-- Pre-upgrade hooks
-- Graceful shutdown with timeout
-- Custom pre-upgrade scripts
-- Improved error handling
-
-## [0.3.0] - TBD
-
-### Planned
-- WBFT consensus integration
-- Validator state monitoring
-- Network-wide coordination
-- Batch upgrade support
-- Automatic binary download with checksum verification
