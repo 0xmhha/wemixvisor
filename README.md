@@ -25,11 +25,14 @@ Wemixvisor is inspired by Cosmos SDK's Cosmovisor and adapted specifically for W
 - Custom pre-upgrade scripts
 - Enhanced error handling
 
-### Phase 3: Advanced Features (v0.3.0) - Planned
-- WBFT consensus state monitoring
-- Automatic binary downloads with checksum
-- Batch upgrade support
-- Network-wide coordination
+### Phase 3: Advanced Features (v0.3.0) - Complete
+- Automatic binary downloads with SHA256/SHA512 checksum verification
+- Batch upgrade support with plan management
+- WBFT consensus integration for coordinated upgrades
+- Validator-specific upgrade coordination
+- Height-based upgrade scheduling
+- Progress reporting for downloads
+- Retry mechanism with exponential backoff
 
 ## Installation
 
@@ -82,6 +85,9 @@ wemixvisor run start
 | `DAEMON_PREUPGRADE_MAX_RETRIES` | `0` | Pre-upgrade script retry attempts |
 | `COSMOVISOR_CUSTOM_PREUPGRADE` | - | Custom pre-upgrade script path |
 | `DAEMON_RPC_ADDRESS` | `localhost:8545` | RPC address for WBFT node |
+| `VALIDATOR_MODE` | `false` | Enable validator-specific features |
+| `DAEMON_ALLOW_DOWNLOAD_BINARIES` | `false` | Allow automatic binary downloads |
+| `UNSAFE_SKIP_CHECKSUM` | `false` | Skip checksum verification for downloads |
 
 ### Directory Structure
 
@@ -92,12 +98,18 @@ $DAEMON_HOME/
 │   ├── genesis/           # Initial binary
 │   │   └── bin/
 │   │       └── wemixd
-│   └── upgrades/          # Upgrade binaries
-│       └── v2.0.0/
-│           └── bin/
-│               └── wemixd
+│   ├── upgrades/          # Upgrade binaries
+│   │   └── v2.0.0/
+│   │       ├── bin/
+│   │       │   └── wemixd
+│   │       └── pre-upgrade  # Optional pre-upgrade script
+│   └── plans/             # Batch upgrade plans (v0.3.0+)
+│       └── q4-2025-20250926-140530.json
 ├── data/
-│   └── upgrade-info.json  # Upgrade trigger file
+│   ├── upgrade-info.json  # Upgrade trigger file
+│   └── upgrades/          # Height-based upgrade info (v0.3.0+)
+│       └── 1000000/
+│           └── upgrade-info.json
 └── backups/               # Data backups (v0.2.0+)
 ```
 
@@ -142,10 +154,15 @@ make lint
 wemixvisor/
 ├── cmd/              # CLI commands
 ├── internal/         # Private packages
+│   ├── backup/       # Data backup functionality
+│   ├── batch/        # Batch upgrade management
 │   ├── commands/     # Command implementations
 │   ├── config/       # Configuration management
+│   ├── download/     # Automatic binary downloads
+│   ├── hooks/        # Pre-upgrade hooks
 │   ├── process/      # Process management
-│   └── upgrade/      # Upgrade handling
+│   ├── upgrade/      # Upgrade handling
+│   └── wbft/         # WBFT consensus integration
 ├── pkg/              # Public packages
 │   ├── logger/       # Logging utilities
 │   └── types/        # Common types
@@ -156,13 +173,14 @@ wemixvisor/
 ## Documentation
 
 - [Phase 1 Documentation](./docs/phase1-mvp.md) - MVP implementation details
+- [Phase 3 Documentation](./docs/phase3-advanced-features.md) - Advanced features guide
 - [Changes Log](./CHANGES.md) - Version history
 
 ## Development Status
 
-- ✅ Phase 1: Basic process management (v0.1.0)
-- 🚧 Phase 2: Core features (v0.2.0)
-- 📋 Phase 3: WBFT integration (v0.3.0)
+- ✅ Phase 1: Basic process management (v0.1.0) - Complete
+- ✅ Phase 2: Core features (v0.2.0) - Complete
+- ✅ Phase 3: Advanced features & WBFT integration (v0.3.0) - Complete
 
 ## Contributing
 
