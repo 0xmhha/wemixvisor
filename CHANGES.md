@@ -7,14 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
-- Project initialization with basic structure
-- CLAUDE.md for development guidelines
-- .gitignore for Go projects
-- README.md with project overview
-- CHANGES.md for version history tracking
-
-## [0.1.0] - 2024-12-31 (Planned)
+## [0.1.0] - 2024-12-26
 
 ### Added
 - Basic process management
