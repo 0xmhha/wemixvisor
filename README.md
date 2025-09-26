@@ -8,22 +8,22 @@ Wemixvisor is inspired by Cosmos SDK's Cosmovisor and adapted specifically for W
 
 ## Features
 
-### Phase 1: MVP (v0.1.0) ✅
-- ✅ Automatic binary upgrade detection
-- ✅ Process lifecycle management
-- ✅ File-based upgrade monitoring
-- ✅ Symbolic link-based version switching
-- ✅ Signal handling (SIGTERM, SIGINT, SIGQUIT)
-- ✅ Configurable polling intervals
-- ✅ Environment variable configuration
+### Phase 1: MVP (v0.1.0) - Complete
+- Automatic binary upgrade detection
+- Process lifecycle management
+- File-based upgrade monitoring
+- Symbolic link-based version switching
+- Signal handling (SIGTERM, SIGINT, SIGQUIT)
+- Configurable polling intervals
+- Environment variable configuration
 
-### Phase 2: Core Features (v0.2.0) ✅
-- ✅ Data backup before upgrades
-- ✅ Pre-upgrade hooks and validation
-- ✅ Graceful shutdown with timeout
-- ✅ Backup restoration on failure
-- ✅ Custom pre-upgrade scripts
-- ✅ Enhanced error handling
+### Phase 2: Core Features (v0.2.0) - Complete
+- Data backup before upgrades
+- Pre-upgrade hooks and validation
+- Graceful shutdown with timeout
+- Backup restoration on failure
+- Custom pre-upgrade scripts
+- Enhanced error handling
 
 ### Phase 3: Advanced Features (v0.3.0) - Planned
 - WBFT consensus state monitoring
