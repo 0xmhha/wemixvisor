@@ -121,6 +121,10 @@ func (p *Parser) validate(args *ParsedArgs) error {
 		// These are handled separately
 	case "version":
 		// No validation needed
+	case "init":
+		// Init command doesn't need node arguments
+	case "run":
+		// Run can have node arguments
 	default:
 		// Unknown commands should have been caught earlier
 		return fmt.Errorf("invalid command: %s", args.Command)
