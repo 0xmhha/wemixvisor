@@ -13,6 +13,8 @@ import (
 
 	"go.uber.org/zap"
 	"github.com/wemix/wemixvisor/internal/config"
+	"github.com/wemix/wemixvisor/internal/metrics"
+	"github.com/wemix/wemixvisor/internal/monitor"
 	"github.com/wemix/wemixvisor/pkg/logger"
 )
 
@@ -33,9 +35,11 @@ type Manager struct {
 	nodeOptions map[string]string
 
 	// Monitoring
-	startTime    time.Time
-	restartCount int
-	maxRestarts  int
+	startTime        time.Time
+	restartCount     int
+	maxRestarts      int
+	healthChecker    *monitor.HealthChecker
+	metricsCollector *metrics.MetricsCollector
 
 	// Channels for lifecycle management
 	stopCh    chan struct{}
@@ -57,19 +61,28 @@ func NewManager(cfg *config.Config, logger *logger.Logger) *Manager {
 		maxRestarts = cfg.MaxRestarts
 	}
 
-	return &Manager{
-		config:      cfg,
-		logger:      logger,
-		state:       StateStopped,
-		nodeOptions: make(map[string]string),
-		maxRestarts: maxRestarts,
-		stopCh:      make(chan struct{}),
-		restartCh:   make(chan struct{}),
-		errorCh:     make(chan error, 10),
-		doneCh:      make(chan struct{}),
-		ctx:         ctx,
-		cancel:      cancel,
+	// Create health checker
+	healthChecker := monitor.NewHealthChecker(cfg, logger)
+
+	manager := &Manager{
+		config:        cfg,
+		logger:        logger,
+		state:         StateStopped,
+		nodeOptions:   make(map[string]string),
+		maxRestarts:   maxRestarts,
+		healthChecker: healthChecker,
+		stopCh:        make(chan struct{}),
+		restartCh:     make(chan struct{}),
+		errorCh:       make(chan error, 10),
+		doneCh:        make(chan struct{}),
+		ctx:           ctx,
+		cancel:        cancel,
 	}
+
+	// Create metrics collector
+	manager.metricsCollector = metrics.NewMetricsCollector(cfg, logger, manager)
+
+	return manager
 }
 
 // Start starts the node with the given arguments
@@ -141,6 +154,26 @@ func (m *Manager) Start(args []string) error {
 	// Start monitoring goroutine
 	go m.monitor()
 
+	// Start health monitoring
+	go func() {
+		healthStatusCh := m.healthChecker.Start()
+		for {
+			select {
+			case status := <-healthStatusCh:
+				if !status.Healthy {
+					m.logger.Warn("health check failed",
+						zap.Bool("healthy", status.Healthy),
+						zap.Any("checks", status.Checks))
+				}
+			case <-m.ctx.Done():
+				return
+			}
+		}
+	}()
+
+	// Start metrics collection
+	m.metricsCollector.Start()
+
 	m.logger.Info("node started successfully",
 		zap.Int("pid", m.process.Pid),
 		zap.Strings("args", args))
@@ -203,6 +236,10 @@ func (m *Manager) Stop() error {
 		// Give it a moment to die
 		time.Sleep(100 * time.Millisecond)
 	}
+
+	// Stop health monitoring and metrics collection
+	m.healthChecker.Stop()
+	m.metricsCollector.Stop()
 
 	m.stateMutex.Lock()
 	m.state = StateStopped
@@ -289,6 +326,25 @@ func (m *Manager) GetStatus() *Status {
 	// Try to get version from binary (only if running)
 	if status.Binary != "" && m.state == StateRunning {
 		status.Version = m.GetVersion()
+	}
+
+	// Get health status if node is running
+	if m.state == StateRunning && m.healthChecker != nil {
+		healthStatus := m.healthChecker.GetStatus()
+		status.Health = &HealthStatus{
+			Healthy:   healthStatus.Healthy,
+			Timestamp: healthStatus.Timestamp,
+			Checks:    make(map[string]CheckResult),
+		}
+
+		// Convert monitor.CheckResult to node.CheckResult
+		for name, check := range healthStatus.Checks {
+			status.Health.Checks[name] = CheckResult{
+				Name:    check.Name,
+				Healthy: check.Healthy,
+				Error:   check.Error,
+			}
+		}
 	}
 
 	return status
@@ -507,6 +563,32 @@ func (m *Manager) SetNodeArgs(args []string) {
 	m.stateMutex.Lock()
 	defer m.stateMutex.Unlock()
 	m.nodeArgs = args
+}
+
+// GetUptime returns the uptime of the node
+func (m *Manager) GetUptime() time.Duration {
+	m.stateMutex.RLock()
+	defer m.stateMutex.RUnlock()
+
+	if m.state == StateRunning && !m.startTime.IsZero() {
+		return time.Since(m.startTime)
+	}
+	return 0
+}
+
+// GetRestartCount returns the number of restarts
+func (m *Manager) GetRestartCount() int {
+	m.stateMutex.RLock()
+	defer m.stateMutex.RUnlock()
+	return m.restartCount
+}
+
+// GetMetrics returns current metrics
+func (m *Manager) GetMetrics() metrics.Metrics {
+	if m.metricsCollector != nil {
+		return m.metricsCollector.GetMetrics()
+	}
+	return metrics.Metrics{}
 }
 
 // Close gracefully shuts down the manager

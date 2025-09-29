@@ -28,6 +28,7 @@ type Config struct {
 	RestartOnFailure    bool              `mapstructure:"daemon_restart_on_failure"`
 	MaxRestarts         int               `mapstructure:"daemon_max_restarts"`
 	HealthCheckInterval time.Duration     `mapstructure:"daemon_health_check_interval"`
+	MetricsInterval     time.Duration     `mapstructure:"daemon_metrics_interval"`
 	RPCPort             int               `mapstructure:"daemon_rpc_port"`
 	LogFile             string            `mapstructure:"daemon_log_file"`
 	Environment         map[string]string `mapstructure:"daemon_environment"`

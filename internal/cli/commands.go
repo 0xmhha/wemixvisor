@@ -48,6 +48,9 @@ func (h *CommandHandler) Execute(args []string) error {
 
 	// Execute command
 	switch parsed.Command {
+	case "init":
+		initCmd := NewInitCommand(h.config, h.logger)
+		return initCmd.Execute(parsed.NodeArgs)
 	case "start":
 		return h.handleStart(parsed)
 	case "stop":
@@ -151,6 +154,28 @@ func (h *CommandHandler) handleStatus() error {
 		fmt.Printf("Restart Count: %d\n", status.RestartCount)
 		if status.Binary != "" {
 			fmt.Printf("Binary: %s\n", status.Binary)
+		}
+
+		// Display health status if available
+		if status.Health != nil {
+			fmt.Printf("\nHealth Status: ")
+			if status.Health.Healthy {
+				fmt.Printf("✅ Healthy\n")
+			} else {
+				fmt.Printf("❌ Unhealthy\n")
+			}
+
+			// Show individual health checks
+			if len(status.Health.Checks) > 0 {
+				fmt.Printf("Health Checks:\n")
+				for name, check := range status.Health.Checks {
+					if check.Healthy {
+						fmt.Printf("  ✅ %s: OK\n", name)
+					} else {
+						fmt.Printf("  ❌ %s: %s\n", name, check.Error)
+					}
+				}
+			}
 		}
 	}
 

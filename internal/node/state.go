@@ -58,6 +58,7 @@ type Status struct {
 	Version      string        `json:"version"`
 	Network      string        `json:"network"`
 	Binary       string        `json:"binary"`
+	Health       *HealthStatus `json:"health,omitempty"`
 }
 
 // MarshalJSON implements json.Marshaler

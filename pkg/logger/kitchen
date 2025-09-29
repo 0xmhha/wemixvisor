@@ -1,0 +1,37 @@
+2025-09-29T19:53:55.319+0900	INFO	logger/logger.go:47	test info
+2025-09-29T19:53:55.320+0900	DEBUG	logger/logger.go:62	test debug
+2025-09-29T19:53:55.320+0900	WARN	logger/logger.go:57	test warn
+github.com/wemix/wemixvisor/pkg/logger.(*Logger).Warn
+	/Users/wm-it-22-00661/workspace/cosmovisor/wemixvisor/pkg/logger/logger.go:57
+github.com/wemix/wemixvisor/pkg/logger.TestNew.func1
+	/Users/wm-it-22-00661/workspace/cosmovisor/wemixvisor/pkg/logger/logger_test.go:71
+testing.tRunner
+	/Users/wm-it-22-00661/.gvm/gos/go1.22.6/src/testing/testing.go:1689
+2025-09-29T19:53:55.320+0900	ERROR	logger/logger.go:52	test error
+github.com/wemix/wemixvisor/pkg/logger.(*Logger).Error
+	/Users/wm-it-22-00661/workspace/cosmovisor/wemixvisor/pkg/logger/logger.go:52
+github.com/wemix/wemixvisor/pkg/logger.TestNew.func1
+	/Users/wm-it-22-00661/workspace/cosmovisor/wemixvisor/pkg/logger/logger_test.go:72
+testing.tRunner
+	/Users/wm-it-22-00661/.gvm/gos/go1.22.6/src/testing/testing.go:1689
+{"level":"info","ts":"2025-09-29T19:53:55.322+0900","caller":"logger/logger.go:47","msg":"test info message","key":"value"}
+{"level":"warn","ts":"2025-09-29T19:53:55.322+0900","caller":"logger/logger.go:57","msg":"test warning message","flag":true}
+{"level":"error","ts":"2025-09-29T19:53:55.322+0900","caller":"logger/logger.go:52","msg":"test error message","stacktrace":"github.com/wemix/wemixvisor/pkg/logger.(*Logger).Error\n\t/Users/wm-it-22-00661/workspace/cosmovisor/wemixvisor/pkg/logger/logger.go:52\ngithub.com/wemix/wemixvisor/pkg/logger.TestLoggerMethods\n\t/Users/wm-it-22-00661/workspace/cosmovisor/wemixvisor/pkg/logger/logger_test.go:94\ntesting.tRunner\n\t/Users/wm-it-22-00661/.gvm/gos/go1.22.6/src/testing/testing.go:1689"}
+{"level":"info","ts":"2025-09-29T19:53:55.322+0900","caller":"logger/logger.go:47","msg":"child logger message","component":"test"}
+2025-09-29T19:53:55.322+0900	[34mINFO[0m	logger/logger.go:47	should not be visible
+2025-09-29T19:53:55.322+0900	[35mDEBUG[0m	logger/logger.go:62	should not be visible
+2025-09-29T19:53:55.322+0900	[33mWARN[0m	logger/logger.go:57	should not be visible
+github.com/wemix/wemixvisor/pkg/logger.(*Logger).Warn
+	/Users/wm-it-22-00661/workspace/cosmovisor/wemixvisor/pkg/logger/logger.go:57
+github.com/wemix/wemixvisor/pkg/logger.TestLoggerWithDisabled
+	/Users/wm-it-22-00661/workspace/cosmovisor/wemixvisor/pkg/logger/logger_test.go:110
+testing.tRunner
+	/Users/wm-it-22-00661/.gvm/gos/go1.22.6/src/testing/testing.go:1689
+2025-09-29T19:53:55.322+0900	[31mERROR[0m	logger/logger.go:52	should not be visible
+github.com/wemix/wemixvisor/pkg/logger.(*Logger).Error
+	/Users/wm-it-22-00661/workspace/cosmovisor/wemixvisor/pkg/logger/logger.go:52
+github.com/wemix/wemixvisor/pkg/logger.TestLoggerWithDisabled
+	/Users/wm-it-22-00661/workspace/cosmovisor/wemixvisor/pkg/logger/logger_test.go:111
+testing.tRunner
+	/Users/wm-it-22-00661/.gvm/gos/go1.22.6/src/testing/testing.go:1689
+2025-09-29T19:53:55.322+0900	[34mINFO[0m	logger/logger.go:47	child logger should not be visible	{"component": "test"}
