@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -120,9 +121,10 @@ func (m *Manager) Start(args []string) error {
 		cmd.Stderr = os.Stderr
 	}
 
-	// Set process group for clean shutdown
+	// Set process group for clean shutdown and zombie prevention
 	cmd.SysProcAttr = &syscall.SysProcAttr{
 		Setpgid: true,
+		Pgid:    0, // Create new process group
 	}
 
 	// Start the process
@@ -162,12 +164,16 @@ func (m *Manager) Stop() error {
 
 	m.logger.Info("stopping node", zap.Int("pid", pid))
 
-	// Send SIGTERM for graceful shutdown
-	if err := process.Signal(syscall.SIGTERM); err != nil {
-		m.logger.Error("failed to send SIGTERM", zap.Error(err))
-		// Try to kill the process group
-		if err := syscall.Kill(-pid, syscall.SIGKILL); err != nil {
-			return fmt.Errorf("failed to kill process: %w", err)
+	// Send SIGTERM to the entire process group for graceful shutdown
+	if err := syscall.Kill(-pid, syscall.SIGTERM); err != nil {
+		m.logger.Error("failed to send SIGTERM to process group", zap.Error(err))
+		// Fallback to individual process
+		if err := process.Signal(syscall.SIGTERM); err != nil {
+			m.logger.Error("failed to send SIGTERM to process", zap.Error(err))
+			// Force kill as last resort
+			if err := syscall.Kill(-pid, syscall.SIGKILL); err != nil {
+				return fmt.Errorf("failed to kill process: %w", err)
+			}
 		}
 	}
 
@@ -186,11 +192,14 @@ func (m *Manager) Stop() error {
 		m.logger.Info("node stopped gracefully")
 	case <-timer.C:
 		m.logger.Warn("grace period exceeded, forcing shutdown")
-		if err := process.Kill(); err != nil {
-			m.logger.Error("failed to kill process", zap.Error(err))
+		// Kill the entire process group
+		if err := syscall.Kill(-pid, syscall.SIGKILL); err != nil {
+			m.logger.Error("failed to kill process group", zap.Error(err))
+			// Fallback to individual process
+			if err := process.Kill(); err != nil {
+				m.logger.Error("failed to kill process", zap.Error(err))
+			}
 		}
-		// Kill the process group
-		syscall.Kill(-pid, syscall.SIGKILL)
 		// Give it a moment to die
 		time.Sleep(100 * time.Millisecond)
 	}
@@ -279,10 +288,7 @@ func (m *Manager) GetStatus() *Status {
 
 	// Try to get version from binary (only if running)
 	if status.Binary != "" && m.state == StateRunning {
-		// Skip version check for now - will be implemented properly later
-		// if version, err := m.getBinaryVersion(); err == nil {
-		// 	status.Version = version
-		// }
+		status.Version = m.GetVersion()
 	}
 
 	return status
@@ -305,6 +311,9 @@ func (m *Manager) monitor() {
 
 	// Wait for process to exit
 	err := cmd.Wait()
+
+	// Reap any zombie child processes
+	go m.reapZombies()
 
 	m.stateMutex.Lock()
 	defer m.stateMutex.Unlock()
@@ -402,19 +411,95 @@ func (m *Manager) getBinaryVersion() (string, error) {
 		return "", fmt.Errorf("no binary found")
 	}
 
-	// Try to get version with --version flag
-	cmd := exec.Command(cmdPath, "version")
-	output, err := cmd.Output()
-	if err != nil {
-		// Try with --version
-		cmd = exec.Command(cmdPath, "--version")
-		output, err = cmd.Output()
-		if err != nil {
-			return "", err
+	// Create a context with timeout to prevent hanging
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// Try different version command patterns
+	versionCmds := [][]string{
+		{"version"},
+		{"--version"},
+		{"-version"},
+		{"-v"},
+	}
+
+	for _, args := range versionCmds {
+		cmd := exec.CommandContext(ctx, cmdPath, args...)
+		output, err := cmd.Output()
+
+		// If command succeeded and returned non-empty output
+		if err == nil && len(output) > 0 {
+			// Trim whitespace and return first line
+			lines := strings.Split(strings.TrimSpace(string(output)), "\n")
+			if len(lines) > 0 && lines[0] != "" {
+				return lines[0], nil
+			}
+		}
+
+		// Check if context timed out
+		if ctx.Err() != nil {
+			return "", fmt.Errorf("timeout getting version: %w", ctx.Err())
 		}
 	}
 
-	return string(output), nil
+	return "", fmt.Errorf("unable to determine binary version")
+}
+
+// GetVersion returns the cached version or fetches it if not cached
+func (m *Manager) GetVersion() string {
+	m.stateMutex.RLock()
+	defer m.stateMutex.RUnlock()
+
+	// Only get version if running
+	if m.state != StateRunning {
+		return "unknown"
+	}
+
+	// Try to get version (with caching in the future)
+	version, err := m.getBinaryVersion()
+	if err != nil {
+		m.logger.Debug("failed to get binary version", zap.Error(err))
+		return "unknown"
+	}
+
+	return version
+}
+
+// reapZombies reaps any zombie child processes
+func (m *Manager) reapZombies() {
+	for {
+		var status syscall.WaitStatus
+		pid, err := syscall.Wait4(-1, &status, syscall.WNOHANG, nil)
+		if err != nil || pid <= 0 {
+			break
+		}
+		m.logger.Debug("reaped zombie process", zap.Int("pid", pid))
+	}
+}
+
+// IsHealthy checks if the node process is healthy
+func (m *Manager) IsHealthy() bool {
+	m.stateMutex.RLock()
+	defer m.stateMutex.RUnlock()
+
+	if m.state != StateRunning || m.process == nil {
+		return false
+	}
+
+	// Check if process is still alive
+	err := m.process.Signal(syscall.Signal(0))
+	return err == nil
+}
+
+// GetPID returns the process ID if running
+func (m *Manager) GetPID() int {
+	m.stateMutex.RLock()
+	defer m.stateMutex.RUnlock()
+
+	if m.process != nil {
+		return m.process.Pid
+	}
+	return 0
 }
 
 // Close gracefully shuts down the manager

@@ -273,6 +273,108 @@ func TestManager_BuildEnvironment(t *testing.T) {
 	assert.True(t, hasCustom)
 }
 
+func TestManager_IsHealthy(t *testing.T) {
+	homeDir := t.TempDir()
+	binDir := filepath.Join(homeDir, "wemixvisor", "current", "bin")
+	require.NoError(t, os.MkdirAll(binDir, 0755))
+
+	mockBin := filepath.Join(binDir, "wemixd")
+	createMockBinary(t, mockBin)
+
+	cfg := &config.Config{
+		Home:          homeDir,
+		Name:          "wemixd",
+		ShutdownGrace: 2 * time.Second,
+	}
+
+	logger := logger.NewTestLogger()
+	manager := NewManager(cfg, logger)
+
+	// Should not be healthy before start
+	assert.False(t, manager.IsHealthy())
+
+	// Start the node
+	err := manager.Start([]string{"--test"})
+	require.NoError(t, err)
+
+	// Should be healthy when running
+	assert.True(t, manager.IsHealthy())
+
+	// Stop the node
+	err = manager.Stop()
+	require.NoError(t, err)
+
+	// Should not be healthy after stop
+	assert.False(t, manager.IsHealthy())
+}
+
+func TestManager_GetPID(t *testing.T) {
+	homeDir := t.TempDir()
+	binDir := filepath.Join(homeDir, "wemixvisor", "current", "bin")
+	require.NoError(t, os.MkdirAll(binDir, 0755))
+
+	mockBin := filepath.Join(binDir, "wemixd")
+	createMockBinary(t, mockBin)
+
+	cfg := &config.Config{
+		Home:          homeDir,
+		Name:          "wemixd",
+		ShutdownGrace: 2 * time.Second,
+	}
+
+	logger := logger.NewTestLogger()
+	manager := NewManager(cfg, logger)
+
+	// PID should be 0 before start
+	assert.Equal(t, 0, manager.GetPID())
+
+	// Start the node
+	err := manager.Start([]string{"--test"})
+	require.NoError(t, err)
+
+	// PID should be non-zero when running
+	pid := manager.GetPID()
+	assert.NotZero(t, pid)
+
+	// Stop the node
+	err = manager.Stop()
+	require.NoError(t, err)
+
+	// PID should be 0 after stop
+	assert.Equal(t, 0, manager.GetPID())
+}
+
+func TestManager_GetVersion(t *testing.T) {
+	homeDir := t.TempDir()
+	binDir := filepath.Join(homeDir, "wemixvisor", "current", "bin")
+	require.NoError(t, os.MkdirAll(binDir, 0755))
+
+	// Create a mock binary that returns version info
+	mockBin := filepath.Join(binDir, "wemixd")
+	createVersionedMockBinary(t, mockBin, "v1.2.3")
+
+	cfg := &config.Config{
+		Home:          homeDir,
+		Name:          "wemixd",
+		ShutdownGrace: 2 * time.Second,
+	}
+
+	logger := logger.NewTestLogger()
+	manager := NewManager(cfg, logger)
+
+	// Version should be unknown before start
+	assert.Equal(t, "unknown", manager.GetVersion())
+
+	// Start the node
+	err := manager.Start([]string{"--test"})
+	require.NoError(t, err)
+	defer manager.Stop()
+
+	// Now version should be available
+	version := manager.GetVersion()
+	assert.Contains(t, version, "v1.2.3")
+}
+
 // Helper functions
 
 func createMockBinary(t *testing.T, path string) {
@@ -286,6 +388,25 @@ while true; do
   sleep 1
 done
 `
+	err := ioutil.WriteFile(path, []byte(script), 0755)
+	require.NoError(t, err)
+}
+
+func createVersionedMockBinary(t *testing.T, path string, version string) {
+	t.Helper()
+
+	// Create a mock binary that returns version info
+	script := fmt.Sprintf(`#!/bin/sh
+# Mock binary with version support
+if [ "$1" = "version" ] || [ "$1" = "--version" ]; then
+  echo "%s"
+  exit 0
+fi
+trap 'exit 0' TERM INT
+while true; do
+  sleep 1
+done
+`, version)
 	err := ioutil.WriteFile(path, []byte(script), 0755)
 	require.NoError(t, err)
 }
