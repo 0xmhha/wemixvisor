@@ -64,7 +64,7 @@ func TestManager_Start_NoBinary(t *testing.T) {
 
 	err := manager.Start([]string{"--testnet"})
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "no binary found")
+	assert.Contains(t, err.Error(), "binary not found")
 	assert.Equal(t, StateError, manager.GetState())
 }
 
@@ -81,6 +81,7 @@ func TestManager_Start_Success(t *testing.T) {
 		Home:             homeDir,
 		Name:             "wemixd",
 		RestartOnFailure: false,
+		ShutdownGrace:    2 * time.Second, // Short grace period for testing
 	}
 
 	logger := logger.NewTestLogger()
@@ -97,7 +98,7 @@ func TestManager_Start_Success(t *testing.T) {
 	assert.NotZero(t, status.StartTime)
 	assert.Equal(t, "running", status.StateString)
 
-	// Stop the node
+	// Stop the node with a short timeout
 	err = manager.Stop()
 	require.NoError(t, err)
 	assert.Equal(t, StateStopped, manager.GetState())
@@ -130,6 +131,7 @@ func TestManager_Restart(t *testing.T) {
 		Home:             homeDir,
 		Name:             "wemixd",
 		RestartOnFailure: false,
+		ShutdownGrace:    2 * time.Second,
 	}
 
 	logger := logger.NewTestLogger()
@@ -205,9 +207,10 @@ func TestManager_GetStatus(t *testing.T) {
 	createMockBinary(t, mockBin)
 
 	cfg := &config.Config{
-		Home:    homeDir,
-		Name:    "wemixd",
-		Network: "testnet",
+		Home:          homeDir,
+		Name:          "wemixd",
+		Network:       "testnet",
+		ShutdownGrace: 2 * time.Second,
 	}
 
 	logger := logger.NewTestLogger()
@@ -275,10 +278,13 @@ func TestManager_BuildEnvironment(t *testing.T) {
 func createMockBinary(t *testing.T, path string) {
 	t.Helper()
 
-	// Create a simple shell script as mock binary
+	// Create a simple shell script as mock binary that handles signals
 	script := `#!/bin/sh
-# Mock binary for testing - runs for a short time then exits
-sleep 30
+# Mock binary for testing
+trap 'exit 0' TERM INT
+while true; do
+  sleep 1
+done
 `
 	err := ioutil.WriteFile(path, []byte(script), 0755)
 	require.NoError(t, err)

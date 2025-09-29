@@ -149,51 +149,61 @@ func (m *Manager) Start(args []string) error {
 // Stop stops the node gracefully
 func (m *Manager) Stop() error {
 	m.stateMutex.Lock()
-	defer m.stateMutex.Unlock()
 
 	if m.state != StateRunning {
+		m.stateMutex.Unlock()
 		return fmt.Errorf("node is not running")
 	}
 
 	m.state = StateStopping
-	m.logger.Info("stopping node", zap.Int("pid", m.process.Pid))
+	pid := m.process.Pid
+	process := m.process
+	m.stateMutex.Unlock()
+
+	m.logger.Info("stopping node", zap.Int("pid", pid))
 
 	// Send SIGTERM for graceful shutdown
-	if err := m.process.Signal(syscall.SIGTERM); err != nil {
+	if err := process.Signal(syscall.SIGTERM); err != nil {
 		m.logger.Error("failed to send SIGTERM", zap.Error(err))
 		// Try to kill the process group
-		if err := syscall.Kill(-m.process.Pid, syscall.SIGKILL); err != nil {
+		if err := syscall.Kill(-pid, syscall.SIGKILL); err != nil {
 			return fmt.Errorf("failed to kill process: %w", err)
 		}
 	}
-
-	// Wait for graceful shutdown or timeout
-	done := make(chan error, 1)
-	go func() {
-		done <- m.cmd.Wait()
-	}()
 
 	shutdownGrace := 30 * time.Second
 	if m.config.ShutdownGrace > 0 {
 		shutdownGrace = m.config.ShutdownGrace
 	}
 
+	// Wait for the monitor goroutine to detect process exit
+	// or timeout if it takes too long
+	timer := time.NewTimer(shutdownGrace)
+	defer timer.Stop()
+
 	select {
-	case <-done:
+	case <-m.doneCh:
 		m.logger.Info("node stopped gracefully")
-	case <-time.After(shutdownGrace):
+	case <-timer.C:
 		m.logger.Warn("grace period exceeded, forcing shutdown")
-		if err := m.process.Kill(); err != nil {
+		if err := process.Kill(); err != nil {
 			m.logger.Error("failed to kill process", zap.Error(err))
 		}
 		// Kill the process group
-		syscall.Kill(-m.process.Pid, syscall.SIGKILL)
+		syscall.Kill(-pid, syscall.SIGKILL)
+		// Give it a moment to die
+		time.Sleep(100 * time.Millisecond)
 	}
 
+	m.stateMutex.Lock()
 	m.state = StateStopped
 	m.cmd = nil
 	m.process = nil
-	close(m.doneCh)
+	if m.doneCh != nil {
+		close(m.doneCh)
+		m.doneCh = nil
+	}
+	m.stateMutex.Unlock()
 
 	return nil
 }
@@ -205,18 +215,30 @@ func (m *Manager) Restart() error {
 	// Save current args
 	args := m.nodeArgs
 
-	// Stop the node
-	if m.GetState() == StateRunning {
+	// Stop the node if it's running
+	currentState := m.GetState()
+	if currentState == StateRunning {
 		if err := m.Stop(); err != nil {
 			return fmt.Errorf("failed to stop node: %w", err)
 		}
+	} else if currentState != StateStopped {
+		// If in error or other state, reset to stopped
+		m.stateMutex.Lock()
+		m.state = StateStopped
+		m.cmd = nil
+		m.process = nil
+		m.stateMutex.Unlock()
 	}
 
 	// Wait briefly before restart
 	time.Sleep(2 * time.Second)
 
 	// Reset done channel
-	m.doneCh = make(chan struct{})
+	m.stateMutex.Lock()
+	if m.doneCh == nil {
+		m.doneCh = make(chan struct{})
+	}
+	m.stateMutex.Unlock()
 
 	// Start with same args
 	if err := m.Start(args); err != nil {
@@ -273,12 +295,16 @@ func (m *Manager) Wait() <-chan struct{} {
 
 // monitor monitors the node process and handles crashes
 func (m *Manager) monitor() {
-	if m.cmd == nil {
+	m.stateMutex.RLock()
+	cmd := m.cmd
+	m.stateMutex.RUnlock()
+
+	if cmd == nil {
 		return
 	}
 
 	// Wait for process to exit
-	err := m.cmd.Wait()
+	err := cmd.Wait()
 
 	m.stateMutex.Lock()
 	defer m.stateMutex.Unlock()
@@ -291,6 +317,12 @@ func (m *Manager) monitor() {
 	// Process crashed unexpectedly
 	m.state = StateCrashed
 	m.logger.Error("node process crashed unexpectedly", zap.Error(err))
+
+	// Close done channel to signal process exit
+	if m.doneCh != nil {
+		close(m.doneCh)
+		m.doneCh = nil
+	}
 
 	// Check if we should auto-restart
 	if m.config.RestartOnFailure && m.restartCount < m.maxRestarts {
