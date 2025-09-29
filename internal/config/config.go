@@ -55,6 +55,11 @@ type Config struct {
 	DisableLogs     bool   `mapstructure:"cosmovisor_disable_logs"`
 	ColorLogs       bool   `mapstructure:"cosmovisor_color_logs"`
 	TimeFormatLogs  string `mapstructure:"cosmovisor_timeformat_logs"`
+
+	// CLI options
+	Daemon      bool `mapstructure:"daemon"`       // Run in background
+	JSONOutput  bool `mapstructure:"json_output"`  // Output in JSON format
+	Quiet       bool `mapstructure:"quiet"`        // Suppress output
 }
 
 // DefaultConfig returns a Config with default values

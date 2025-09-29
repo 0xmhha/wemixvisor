@@ -502,6 +502,13 @@ func (m *Manager) GetPID() int {
 	return 0
 }
 
+// SetNodeArgs sets the node arguments for next start
+func (m *Manager) SetNodeArgs(args []string) {
+	m.stateMutex.Lock()
+	defer m.stateMutex.Unlock()
+	m.nodeArgs = args
+}
+
 // Close gracefully shuts down the manager
 func (m *Manager) Close() error {
 	m.cancel()
