@@ -24,6 +24,16 @@ type Config struct {
 	ShutdownGrace time.Duration `mapstructure:"daemon_shutdown_grace"`
 	PollInterval  time.Duration `mapstructure:"daemon_poll_interval"`
 
+	// Phase 4: Node lifecycle management
+	RestartOnFailure    bool              `mapstructure:"daemon_restart_on_failure"`
+	MaxRestarts         int               `mapstructure:"daemon_max_restarts"`
+	HealthCheckInterval time.Duration     `mapstructure:"daemon_health_check_interval"`
+	RPCPort             int               `mapstructure:"daemon_rpc_port"`
+	LogFile             string            `mapstructure:"daemon_log_file"`
+	Environment         map[string]string `mapstructure:"daemon_environment"`
+	Network             string            `mapstructure:"daemon_network"`
+	Debug               bool              `mapstructure:"daemon_debug"`
+
 	// Backup settings
 	UnsafeSkipBackup bool   `mapstructure:"unsafe_skip_backup"`
 	DataBackupPath   string `mapstructure:"daemon_data_backup_dir"`
@@ -61,8 +71,16 @@ func DefaultConfig() *Config {
 		DownloadMustHaveChecksum: false,
 		RestartAfterUpgrade:      true,
 		RestartDelay:             0,
-		ShutdownGrace:            0,
+		ShutdownGrace:            30 * time.Second,
 		PollInterval:             300 * time.Millisecond,
+		RestartOnFailure:         true,
+		MaxRestarts:              5,
+		HealthCheckInterval:      30 * time.Second,
+		RPCPort:                  8545,
+		LogFile:                  "",
+		Environment:              make(map[string]string),
+		Network:                  "mainnet",
+		Debug:                    false,
 		UnsafeSkipBackup:         false,
 		DataBackupPath:           filepath.Join(home, "backups"),
 		PreUpgradeMaxRetries:     0,
