@@ -34,6 +34,17 @@ Wemixvisor is inspired by Cosmos SDK's Cosmovisor and adapted specifically for W
 - Progress reporting for downloads
 - Retry mechanism with exponential backoff
 
+### Phase 4: Node Lifecycle Management (v0.4.0) - Complete
+- Enhanced node process lifecycle management
+- Robust start/stop/restart operations with state machine
+- Graceful shutdown with configurable timeout (SIGTERM → SIGKILL)
+- Auto-restart mechanism with configurable max limits
+- Process group management and zombie prevention
+- Real-time health monitoring and PID tracking
+- Binary version detection with multiple command patterns
+- Thread-safe concurrent operations
+- Comprehensive error handling and recovery
+
 ## Installation
 
 ### From Source
@@ -88,6 +99,10 @@ wemixvisor run start
 | `VALIDATOR_MODE` | `false` | Enable validator-specific features |
 | `DAEMON_ALLOW_DOWNLOAD_BINARIES` | `false` | Allow automatic binary downloads |
 | `UNSAFE_SKIP_CHECKSUM` | `false` | Skip checksum verification for downloads |
+| `DAEMON_RESTART_ON_FAILURE` | `true` | Auto-restart on process failure |
+| `DAEMON_MAX_RESTARTS` | `5` | Maximum auto-restart attempts |
+| `DAEMON_HEALTH_CHECK_INTERVAL` | `30s` | Health check interval |
+| `DAEMON_LOG_FILE` | - | Log file path for node output |
 
 ### Directory Structure
 
@@ -160,6 +175,7 @@ wemixvisor/
 │   ├── config/       # Configuration management
 │   ├── download/     # Automatic binary downloads
 │   ├── hooks/        # Pre-upgrade hooks
+│   ├── node/         # Node lifecycle management (Phase 4)
 │   ├── process/      # Process management
 │   ├── upgrade/      # Upgrade handling
 │   └── wbft/         # WBFT consensus integration
@@ -174,6 +190,7 @@ wemixvisor/
 
 - [Phase 1 Documentation](./docs/phase1-mvp.md) - MVP implementation details
 - [Phase 3 Documentation](./docs/phase3-advanced-features.md) - Advanced features guide
+- [Phase 4 Documentation](./docs/phase4-implementation-guide.md) - Node lifecycle management
 - [Changes Log](./CHANGES.md) - Version history
 
 ## Development Status
@@ -181,6 +198,11 @@ wemixvisor/
 - ✅ Phase 1: Basic process management (v0.1.0) - Complete
 - ✅ Phase 2: Core features (v0.2.0) - Complete
 - ✅ Phase 3: Advanced features & WBFT integration (v0.3.0) - Complete
+- ✅ Phase 4: Node lifecycle management (v0.4.0) - Complete
+  - Enhanced process lifecycle with state machine
+  - Auto-restart with configurable limits
+  - Health monitoring and version detection
+  - 91.2% test coverage achieved
 
 ## Contributing
 
