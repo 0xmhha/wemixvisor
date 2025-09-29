@@ -1,0 +1,76 @@
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+wemixvisor
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool
+*.out
+coverage.txt
+coverage.html
+
+# Dependency directories
+vendor/
+
+# Go workspace files
+go.work
+go.work.sum
+
+# IDE specific files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Environment variables
+.env
+.env.local
+
+# Build directories
+dist/
+build/
+bin/
+
+# Debug files
+debug
+debug.test
+*.log
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Test data
+testdata/backups/
+testdata/upgrades/
+testdata/current
+
+# Local configuration
+config.local.toml
+config.local.yaml
+
+# Node data (for testing)
+data/
+.wemixd/
+
+# Profiling data
+*.prof
+*.pprof
+
+# Generated files
+*.generated.go
+
+# Documentation build
+docs/_build/
+docs/.doctrees/
+
+# Development guidelines (local only)
+CLAUDE.md
