@@ -72,10 +72,8 @@ func NewMetricsCollector(cfg *config.Config, logger *logger.Logger, nodeInfo Nod
 func (c *MetricsCollector) Start() {
 	c.logger.Info("starting metrics collection")
 
-	// Collect initial metrics
-	c.collectMetrics()
-
-	// Start collection loop
+	// Start collection loop (initial metrics will be collected in the goroutine)
+	// This prevents deadlock when called while Manager holds a lock
 	go c.run()
 }
 
@@ -97,6 +95,9 @@ func (c *MetricsCollector) GetMetrics() Metrics {
 
 // run is the main collection loop
 func (c *MetricsCollector) run() {
+	// Collect initial metrics
+	c.collectMetrics()
+
 	for {
 		select {
 		case <-c.ctx.Done():

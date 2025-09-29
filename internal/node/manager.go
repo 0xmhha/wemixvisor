@@ -88,9 +88,10 @@ func NewManager(cfg *config.Config, logger *logger.Logger) *Manager {
 // Start starts the node with the given arguments
 func (m *Manager) Start(args []string) error {
 	m.stateMutex.Lock()
-	defer m.stateMutex.Unlock()
+	// Note: We manually unlock the mutex to prevent deadlock with metrics collector
 
 	if m.state != StateStopped {
+		m.stateMutex.Unlock()
 		return fmt.Errorf("node is not in stopped state: %v", m.state)
 	}
 
@@ -101,12 +102,14 @@ func (m *Manager) Start(args []string) error {
 	cmdPath := m.config.CurrentBin()
 	if cmdPath == "" {
 		m.state = StateError
+		m.stateMutex.Unlock()
 		return fmt.Errorf("no binary found")
 	}
 
 	// Ensure binary exists and is executable
 	if _, err := os.Stat(cmdPath); err != nil {
 		m.state = StateError
+		m.stateMutex.Unlock()
 		return fmt.Errorf("binary not found: %w", err)
 	}
 
@@ -143,6 +146,7 @@ func (m *Manager) Start(args []string) error {
 	// Start the process
 	if err := cmd.Start(); err != nil {
 		m.state = StateError
+		m.stateMutex.Unlock()
 		return fmt.Errorf("failed to start node: %w", err)
 	}
 
@@ -150,6 +154,10 @@ func (m *Manager) Start(args []string) error {
 	m.process = cmd.Process
 	m.startTime = time.Now()
 	m.state = StateRunning
+	pid := m.process.Pid
+
+	// Unlock mutex before starting other components to prevent deadlock
+	m.stateMutex.Unlock()
 
 	// Start monitoring goroutine
 	go m.monitor()
@@ -171,11 +179,11 @@ func (m *Manager) Start(args []string) error {
 		}
 	}()
 
-	// Start metrics collection
+	// Start metrics collection (safe to call after mutex unlock)
 	m.metricsCollector.Start()
 
 	m.logger.Info("node started successfully",
-		zap.Int("pid", m.process.Pid),
+		zap.Int("pid", pid),
 		zap.Strings("args", args))
 
 	return nil

@@ -52,6 +52,10 @@ type HealthChecker struct {
 
 	// Channels
 	statusCh chan HealthStatus
+
+	// Stop tracking
+	stopped   bool
+	stopMutex sync.Mutex
 }
 
 // NewHealthChecker creates a new health checker
@@ -94,14 +98,26 @@ func (h *HealthChecker) Start() <-chan HealthStatus {
 
 // Stop stops the health monitoring
 func (h *HealthChecker) Stop() {
+	h.stopMutex.Lock()
+	h.stopped = true
+	h.stopMutex.Unlock()
+
 	h.cancel()
-	close(h.statusCh)
+	// Don't close the channel here, let the goroutine handle it
 }
 
 // run is the main monitoring loop
 func (h *HealthChecker) run() {
 	ticker := time.NewTicker(h.checkInterval)
 	defer ticker.Stop()
+	defer func() {
+		// Close channel only if not already stopped
+		h.stopMutex.Lock()
+		if !h.stopped {
+			close(h.statusCh)
+		}
+		h.stopMutex.Unlock()
+	}()
 
 	// Perform initial check immediately
 	h.performChecks()
@@ -155,11 +171,15 @@ func (h *HealthChecker) performChecks() {
 	h.statusMutex.Unlock()
 
 	// Send status update (non-blocking)
-	select {
-	case h.statusCh <- status:
-	default:
-		// Channel full, skip this update
+	h.stopMutex.Lock()
+	if !h.stopped {
+		select {
+		case h.statusCh <- status:
+		default:
+			// Channel full, skip this update
+		}
 	}
+	h.stopMutex.Unlock()
 }
 
 // GetStatus returns the last health status
