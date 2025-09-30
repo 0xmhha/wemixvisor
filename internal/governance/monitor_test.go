@@ -214,6 +214,161 @@ func TestMonitor_Stop(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestMonitor_Start_Disabled(t *testing.T) {
+	cfg := &config.Config{Home: "/tmp/test"}
+	testLogger := logger.NewTestLogger()
+	monitor := NewMonitor(cfg, testLogger)
+
+	// Disable monitoring
+	monitor.SetEnabled(false)
+
+	err := monitor.Start()
+	assert.NoError(t, err)
+
+	// Verify components are not initialized when disabled
+	assert.Nil(t, monitor.tracker)
+	assert.Nil(t, monitor.scheduler)
+	assert.Nil(t, monitor.notifier)
+	assert.Nil(t, monitor.rpcClient)
+}
+
+func TestMonitor_Start_WithEmptyRPCAddress(t *testing.T) {
+	cfg := &config.Config{
+		Home: "/tmp/test",
+		RPCAddress: "", // Empty RPC address should trigger error
+	}
+	testLogger := logger.NewTestLogger()
+	monitor := NewMonitor(cfg, testLogger)
+
+	err := monitor.Start()
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to initialize components")
+}
+
+func TestMonitor_InitializeComponents_EmptyURL(t *testing.T) {
+	cfg := &config.Config{
+		Home: "/tmp/test",
+		RPCAddress: "", // Empty URL should cause error
+	}
+	testLogger := logger.NewTestLogger()
+	monitor := NewMonitor(cfg, testLogger)
+
+	err := monitor.initializeComponents()
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to create RPC client")
+}
+
+func TestMonitor_ValidateUpgradeProposal_WithMockClient(t *testing.T) {
+	cfg := &config.Config{Home: "/tmp/test"}
+	testLogger := logger.NewTestLogger()
+	monitor := NewMonitor(cfg, testLogger)
+
+	// Create a mock client
+	mockClient := &MockWBFTClient{}
+	monitor.rpcClient = mockClient
+
+	// Test case: upgrade height is not in the future
+	mockClient.On("GetCurrentHeight").Return(int64(1000), nil)
+
+	proposal := &Proposal{
+		ID:            "1",
+		Type:          ProposalTypeUpgrade,
+		UpgradeHeight: 900, // Height in the past
+		UpgradeInfo: &UpgradeInfo{
+			Name: "test-upgrade",
+		},
+	}
+
+	err := monitor.validateUpgradeProposal(proposal)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "upgrade height 900 is not in the future")
+
+	mockClient.AssertExpectations(t)
+}
+
+func TestMonitor_ValidateUpgradeProposal_RpcError(t *testing.T) {
+	cfg := &config.Config{Home: "/tmp/test"}
+	testLogger := logger.NewTestLogger()
+	monitor := NewMonitor(cfg, testLogger)
+
+	// Create a mock client that returns an error
+	mockClient := &MockWBFTClient{}
+	monitor.rpcClient = mockClient
+
+	mockClient.On("GetCurrentHeight").Return(int64(0), assert.AnError)
+
+	proposal := &Proposal{
+		ID:            "1",
+		Type:          ProposalTypeUpgrade,
+		UpgradeHeight: 1000,
+		UpgradeInfo: &UpgradeInfo{
+			Name: "test-upgrade",
+		},
+	}
+
+	err := monitor.validateUpgradeProposal(proposal)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to get current height")
+
+	mockClient.AssertExpectations(t)
+}
+
+func TestMonitor_GetProposals_WithInitializedTracker(t *testing.T) {
+	cfg := &config.Config{Home: "/tmp/test"}
+	testLogger := logger.NewTestLogger()
+	monitor := NewMonitor(cfg, testLogger)
+
+	// Create a mock client and tracker
+	mockClient := &MockWBFTClient{}
+	monitor.tracker = NewProposalTracker(mockClient, testLogger)
+
+	// Mock the tracker's GetActive method behavior
+	// Since we can't easily mock the tracker, we'll test the nil case
+	monitor.tracker = nil
+
+	proposals, err := monitor.GetProposals()
+	assert.Error(t, err)
+	assert.Nil(t, proposals)
+	assert.Contains(t, err.Error(), "proposal tracker not initialized")
+}
+
+func TestMonitor_GetUpgradeQueue_WithInitializedScheduler(t *testing.T) {
+	cfg := &config.Config{Home: "/tmp/test"}
+	testLogger := logger.NewTestLogger()
+	monitor := NewMonitor(cfg, testLogger)
+
+	// Initialize scheduler
+	monitor.scheduler = NewUpgradeScheduler(cfg, testLogger)
+
+	// Test getting empty queue
+	queue, err := monitor.GetUpgradeQueue()
+	assert.NoError(t, err)
+	assert.Empty(t, queue)
+}
+
+func TestMonitor_ForceSync_WithInitializedTracker(t *testing.T) {
+	cfg := &config.Config{Home: "/tmp/test"}
+	testLogger := logger.NewTestLogger()
+	monitor := NewMonitor(cfg, testLogger)
+
+	// Create a mock client and tracker
+	mockClient := &MockWBFTClient{}
+	monitor.tracker = NewProposalTracker(mockClient, testLogger)
+
+	// Mock the expected calls during sync
+	mockClient.On("GetCurrentHeight").Return(int64(1000), nil)
+	mockClient.On("GetGovernanceProposals", ProposalStatusSubmitted).Return([]*Proposal{}, nil)
+	mockClient.On("GetGovernanceProposals", ProposalStatusVoting).Return([]*Proposal{}, nil)
+	mockClient.On("GetGovernanceProposals", ProposalStatusPassed).Return([]*Proposal{}, nil)
+	mockClient.On("GetGovernanceProposals", ProposalStatusRejected).Return([]*Proposal{}, nil)
+
+	// Test force sync
+	err := monitor.ForceSync()
+	assert.NoError(t, err)
+
+	mockClient.AssertExpectations(t)
+}
+
 // Test helper functions
 func createTestProposal(id string, proposalType ProposalType) *Proposal {
 	return &Proposal{

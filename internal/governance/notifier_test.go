@@ -469,3 +469,326 @@ func TestGenerateNotificationID(t *testing.T) {
 	assert.NotEqual(t, id1, id2)
 	assert.Contains(t, id1, "notif_")
 }
+
+// Advanced Scenario Tests
+
+func TestNotifier_Start(t *testing.T) {
+	testLogger := logger.NewTestLogger()
+	notifier := NewNotifier(testLogger)
+
+	// Add some handlers
+	handler1 := &MockNotificationHandler{handlerType: "enabled", enabled: true}
+	handler2 := &MockNotificationHandler{handlerType: "disabled", enabled: false}
+	notifier.AddHandler(handler1)
+	notifier.AddHandler(handler2)
+
+	err := notifier.Start()
+	assert.NoError(t, err)
+}
+
+func TestNotifier_Start_Disabled(t *testing.T) {
+	testLogger := logger.NewTestLogger()
+	notifier := NewNotifier(testLogger)
+	notifier.SetEnabled(false)
+
+	err := notifier.Start()
+	assert.NoError(t, err)
+}
+
+func TestNotifier_Stop(t *testing.T) {
+	testLogger := logger.NewTestLogger()
+	notifier := NewNotifier(testLogger)
+
+	err := notifier.Stop()
+	assert.NoError(t, err)
+	assert.False(t, notifier.enabled)
+}
+
+func TestNotifier_NotifyProposalRejected(t *testing.T) {
+	testLogger := logger.NewTestLogger()
+	notifier := NewNotifier(testLogger)
+
+	proposal := &Proposal{
+		ID:    "1",
+		Title: "Test Proposal",
+		Type:  ProposalTypeText,
+	}
+
+	notifier.NotifyProposalRejected(proposal)
+
+	assert.Len(t, notifier.notifications, 1)
+
+	var notification *Notification
+	for _, n := range notifier.notifications {
+		notification = n
+		break
+	}
+
+	assert.Equal(t, EventProposalRejected, notification.Event)
+	assert.Contains(t, notification.Title, "Proposal Rejected")
+	assert.Equal(t, PriorityMedium, notification.Priority)
+}
+
+func TestNotifier_NotifyUpgradeCompleted(t *testing.T) {
+	testLogger := logger.NewTestLogger()
+	notifier := NewNotifier(testLogger)
+
+	upgrade := &UpgradeInfo{
+		Name:   "test-upgrade",
+		Height: 1000,
+	}
+
+	notifier.NotifyUpgradeCompleted(upgrade)
+
+	assert.Len(t, notifier.notifications, 1)
+
+	var notification *Notification
+	for _, n := range notifier.notifications {
+		notification = n
+		break
+	}
+
+	assert.Equal(t, EventUpgradeCompleted, notification.Event)
+	assert.Contains(t, notification.Title, "Upgrade Completed")
+	assert.Equal(t, PriorityHigh, notification.Priority)
+}
+
+func TestNotifier_NotifyVotingStarted(t *testing.T) {
+	testLogger := logger.NewTestLogger()
+	notifier := NewNotifier(testLogger)
+
+	votingEndTime := time.Now().Add(24 * time.Hour)
+	proposal := &Proposal{
+		ID:             "1",
+		Title:          "Test Proposal",
+		Type:           ProposalTypeText,
+		VotingEndTime:  votingEndTime,
+	}
+
+	notifier.NotifyVotingStarted(proposal)
+
+	assert.Len(t, notifier.notifications, 1)
+
+	var notification *Notification
+	for _, n := range notifier.notifications {
+		notification = n
+		break
+	}
+
+	assert.Equal(t, EventVotingStarted, notification.Event)
+	assert.Contains(t, notification.Title, "Voting Started")
+	assert.Contains(t, notification.Message, votingEndTime.Format(time.RFC3339))
+}
+
+func TestNotifier_NotifyVotingEnded(t *testing.T) {
+	testLogger := logger.NewTestLogger()
+	notifier := NewNotifier(testLogger)
+
+	proposal := &Proposal{
+		ID:     "1",
+		Title:  "Test Proposal",
+		Type:   ProposalTypeText,
+		Status: ProposalStatusPassed,
+	}
+
+	notifier.NotifyVotingEnded(proposal)
+
+	assert.Len(t, notifier.notifications, 1)
+
+	var notification *Notification
+	for _, n := range notifier.notifications {
+		notification = n
+		break
+	}
+
+	assert.Equal(t, EventVotingEnded, notification.Event)
+	assert.Contains(t, notification.Title, "Voting Ended")
+	assert.Contains(t, notification.Message, string(ProposalStatusPassed))
+}
+
+func TestNotifier_NotifyQuorumReached(t *testing.T) {
+	testLogger := logger.NewTestLogger()
+	notifier := NewNotifier(testLogger)
+
+	proposal := &Proposal{
+		ID:    "1",
+		Title: "Test Proposal",
+		Type:  ProposalTypeText,
+		VotingStats: &VotingStats{
+			Turnout: 0.75, // 75% turnout
+		},
+	}
+
+	notifier.NotifyQuorumReached(proposal)
+
+	assert.Len(t, notifier.notifications, 1)
+
+	var notification *Notification
+	for _, n := range notifier.notifications {
+		notification = n
+		break
+	}
+
+	assert.Equal(t, EventQuorumReached, notification.Event)
+	assert.Contains(t, notification.Title, "Quorum Reached")
+	assert.Contains(t, notification.Message, "75.00%")
+	assert.Equal(t, PriorityHigh, notification.Priority)
+}
+
+func TestNotifier_NotifyEmergencyProposal(t *testing.T) {
+	testLogger := logger.NewTestLogger()
+	notifier := NewNotifier(testLogger)
+
+	proposal := &Proposal{
+		ID:    "1",
+		Title: "Emergency Fix",
+		Type:  ProposalTypeUpgrade,
+	}
+
+	notifier.NotifyEmergencyProposal(proposal)
+
+	assert.Len(t, notifier.notifications, 1)
+
+	var notification *Notification
+	for _, n := range notifier.notifications {
+		notification = n
+		break
+	}
+
+	assert.Equal(t, EventEmergencyProposal, notification.Event)
+	assert.Contains(t, notification.Title, "EMERGENCY PROPOSAL")
+	assert.Equal(t, PriorityCritical, notification.Priority)
+}
+
+func TestNotifier_HandlerError(t *testing.T) {
+	testLogger := logger.NewTestLogger()
+	notifier := NewNotifier(testLogger)
+
+	// Add handler that will fail
+	failingHandler := &MockNotificationHandler{
+		handlerType: "failing",
+		enabled:     true,
+	}
+	failingHandler.On("Handle", mock.AnythingOfType("*governance.Notification")).Return(assert.AnError)
+
+	notifier.AddHandler(failingHandler)
+
+	proposal := &Proposal{
+		ID:    "1",
+		Title: "Test Proposal",
+		Type:  ProposalTypeText,
+	}
+
+	notifier.NotifyNewProposal(proposal)
+
+	// Give time for goroutines to complete
+	time.Sleep(50 * time.Millisecond)
+
+	// Should have created notification despite handler failure
+	assert.Len(t, notifier.notifications, 1)
+	failingHandler.AssertExpectations(t)
+}
+
+func TestNotifier_MultipleHandlersWithPriorities(t *testing.T) {
+	testLogger := logger.NewTestLogger()
+	notifier := NewNotifier(testLogger)
+
+	// Add multiple handlers
+	handler1 := &MockNotificationHandler{handlerType: "handler1", enabled: true}
+	handler1.On("Handle", mock.AnythingOfType("*governance.Notification")).Return(nil)
+
+	handler2 := &MockNotificationHandler{handlerType: "handler2", enabled: true}
+	handler2.On("Handle", mock.AnythingOfType("*governance.Notification")).Return(nil)
+
+	notifier.AddHandler(handler1)
+	notifier.AddHandler(handler2)
+
+	// Test different priority notifications
+	proposal := &Proposal{ID: "1", Title: "Test", Type: ProposalTypeText}
+	upgrade := &UpgradeInfo{Name: "test-upgrade", Height: 1000}
+
+	notifier.NotifyNewProposal(proposal)          // Medium priority
+	notifier.NotifyUpgradeTriggered(upgrade)      // Critical priority
+	notifier.NotifyEmergencyProposal(proposal)    // Critical priority
+
+	// Give time for goroutines to complete
+	time.Sleep(50 * time.Millisecond)
+
+	assert.Len(t, notifier.notifications, 3)
+
+	// Verify both handlers were called for each notification (3 times each)
+	handler1.AssertNumberOfCalls(t, "Handle", 3)
+	handler2.AssertNumberOfCalls(t, "Handle", 3)
+}
+
+func TestNotifier_ConcurrentNotifications(t *testing.T) {
+	testLogger := logger.NewTestLogger()
+	notifier := NewNotifier(testLogger)
+
+	handler := &MockNotificationHandler{handlerType: "test", enabled: true}
+	handler.On("Handle", mock.AnythingOfType("*governance.Notification")).Return(nil)
+	notifier.AddHandler(handler)
+
+	// Send multiple notifications concurrently
+	numNotifications := 10
+	proposal := &Proposal{ID: "1", Title: "Test", Type: ProposalTypeText}
+
+	for i := 0; i < numNotifications; i++ {
+		go notifier.NotifyNewProposal(proposal)
+	}
+
+	// Give time for all goroutines to complete
+	time.Sleep(100 * time.Millisecond)
+
+	// Should have created all notifications
+	assert.Len(t, notifier.notifications, numNotifications)
+	handler.AssertNumberOfCalls(t, "Handle", numNotifications)
+}
+
+func TestNotifier_MaxNotificationsLimit(t *testing.T) {
+	testLogger := logger.NewTestLogger()
+	notifier := NewNotifier(testLogger)
+	notifier.maxNotifications = 3 // Set low limit for testing
+
+	proposal := &Proposal{ID: "1", Title: "Test", Type: ProposalTypeText}
+
+	// Add notifications beyond the limit
+	for i := 0; i < 5; i++ {
+		notifier.NotifyNewProposal(proposal)
+		time.Sleep(1 * time.Millisecond) // Ensure different timestamps
+	}
+
+	// Trigger cleanup
+	notifier.CleanupOld()
+
+	// Should only keep the maximum allowed
+	assert.Len(t, notifier.notifications, notifier.maxNotifications)
+}
+
+func TestNotifier_GetPriorityForUnknownEvent(t *testing.T) {
+	testLogger := logger.NewTestLogger()
+	notifier := NewNotifier(testLogger)
+
+	// Test with unknown event
+	unknownEvent := NotificationEvent("unknown_event")
+	priority := notifier.getPriority(unknownEvent)
+
+	assert.Equal(t, PriorityMedium, priority) // Should default to medium
+}
+
+func TestNotifier_CountEnabledHandlers(t *testing.T) {
+	testLogger := logger.NewTestLogger()
+	notifier := NewNotifier(testLogger)
+
+	// Add mix of enabled and disabled handlers
+	handler1 := &MockNotificationHandler{handlerType: "enabled1", enabled: true}
+	handler2 := &MockNotificationHandler{handlerType: "disabled", enabled: false}
+	handler3 := &MockNotificationHandler{handlerType: "enabled2", enabled: true}
+
+	notifier.AddHandler(handler1)
+	notifier.AddHandler(handler2)
+	notifier.AddHandler(handler3)
+
+	count := notifier.countEnabledHandlers()
+	assert.Equal(t, 2, count)
+}

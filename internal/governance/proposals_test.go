@@ -354,3 +354,189 @@ func TestProposalTracker_Stop(t *testing.T) {
 	assert.NoError(t, err)
 	assert.False(t, tracker.enableAutoSync)
 }
+
+func TestProposalTracker_Sync_Success(t *testing.T) {
+	mockClient := &MockWBFTClient{}
+	testLogger := logger.NewTestLogger()
+	tracker := NewProposalTracker(mockClient, testLogger)
+
+	// Mock successful fetch of all proposal statuses
+	mockClient.On("GetGovernanceProposals", ProposalStatusSubmitted).Return([]*Proposal{}, nil)
+	mockClient.On("GetGovernanceProposals", ProposalStatusVoting).Return([]*Proposal{}, nil)
+	mockClient.On("GetGovernanceProposals", ProposalStatusPassed).Return([]*Proposal{}, nil)
+	mockClient.On("GetGovernanceProposals", ProposalStatusRejected).Return([]*Proposal{}, nil)
+	mockClient.On("GetCurrentHeight").Return(int64(1000), nil)
+
+	err := tracker.Sync()
+	assert.NoError(t, err)
+
+	mockClient.AssertExpectations(t)
+}
+
+func TestProposalTracker_FetchLatest_Error(t *testing.T) {
+	mockClient := &MockWBFTClient{}
+	testLogger := logger.NewTestLogger()
+	tracker := NewProposalTracker(mockClient, testLogger)
+
+	// Mock error for some statuses but success for others
+	mockClient.On("GetGovernanceProposals", ProposalStatusSubmitted).Return([]*Proposal{}, nil)
+	mockClient.On("GetGovernanceProposals", ProposalStatusVoting).Return([]*Proposal{}, assert.AnError)
+	mockClient.On("GetGovernanceProposals", ProposalStatusPassed).Return([]*Proposal{}, nil)
+	mockClient.On("GetGovernanceProposals", ProposalStatusRejected).Return([]*Proposal{}, nil)
+
+	proposals, err := tracker.FetchLatest()
+
+	// Should succeed even if some calls fail
+	assert.NoError(t, err)
+	assert.Empty(t, proposals)
+
+	mockClient.AssertExpectations(t)
+}
+
+func TestProposalTracker_UpdateVotingStatus_Error(t *testing.T) {
+	mockClient := &MockWBFTClient{}
+	testLogger := logger.NewTestLogger()
+	tracker := NewProposalTracker(mockClient, testLogger)
+
+	// Mock error for GetProposal
+	mockClient.On("GetProposal", "1").Return((*Proposal)(nil), assert.AnError)
+
+	err := tracker.UpdateVotingStatus("1")
+	assert.Error(t, err)
+
+	mockClient.AssertExpectations(t)
+}
+
+func TestProposalTracker_UpdateVotingStatus_Success(t *testing.T) {
+	mockClient := &MockWBFTClient{}
+	testLogger := logger.NewTestLogger()
+	tracker := NewProposalTracker(mockClient, testLogger)
+
+	// Create a test proposal
+	testProposal := &Proposal{
+		ID:     "1",
+		Status: ProposalStatusVoting,
+	}
+
+	// Add proposal to tracker first
+	tracker.proposals["1"] = testProposal
+
+	// Mock successful GetProposal response
+	updatedProposal := &Proposal{
+		ID:     "1",
+		Status: ProposalStatusPassed,
+	}
+	mockClient.On("GetProposal", "1").Return(updatedProposal, nil)
+
+	err := tracker.UpdateVotingStatus("1")
+	assert.NoError(t, err)
+
+	// Check that proposal was updated
+	assert.Equal(t, ProposalStatusPassed, tracker.proposals["1"].Status)
+
+	mockClient.AssertExpectations(t)
+}
+
+func TestProposalTracker_GetActive_Empty(t *testing.T) {
+	mockClient := &MockWBFTClient{}
+	testLogger := logger.NewTestLogger()
+	tracker := NewProposalTracker(mockClient, testLogger)
+
+	proposals, err := tracker.GetActive()
+	assert.NoError(t, err)
+	assert.Empty(t, proposals)
+}
+
+func TestProposalTracker_GetActive_WithProposals(t *testing.T) {
+	mockClient := &MockWBFTClient{}
+	testLogger := logger.NewTestLogger()
+	tracker := NewProposalTracker(mockClient, testLogger)
+
+	// Add test proposals
+	activeProposal := &Proposal{
+		ID:     "1",
+		Status: ProposalStatusVoting,
+	}
+	completedProposal := &Proposal{
+		ID:     "2",
+		Status: ProposalStatusPassed,
+	}
+
+	tracker.proposals["1"] = activeProposal
+	tracker.proposals["2"] = completedProposal
+	tracker.activeProposals["1"] = activeProposal
+
+	proposals, err := tracker.GetActive()
+	assert.NoError(t, err)
+	assert.Len(t, proposals, 1)
+	assert.Equal(t, "1", proposals[0].ID)
+}
+
+func TestProposalTracker_GetAll(t *testing.T) {
+	mockClient := &MockWBFTClient{}
+	testLogger := logger.NewTestLogger()
+	tracker := NewProposalTracker(mockClient, testLogger)
+
+	// Add test proposals
+	activeProposal := &Proposal{
+		ID:     "1",
+		Status: ProposalStatusVoting,
+	}
+	completedProposal := &Proposal{
+		ID:     "2",
+		Status: ProposalStatusPassed,
+	}
+
+	tracker.proposals["1"] = activeProposal
+	tracker.proposals["2"] = completedProposal
+
+	proposals, err := tracker.GetAll()
+	assert.NoError(t, err)
+	assert.Len(t, proposals, 2)
+}
+
+func TestProposalTracker_GetByType_Additional(t *testing.T) {
+	mockClient := &MockWBFTClient{}
+	testLogger := logger.NewTestLogger()
+	tracker := NewProposalTracker(mockClient, testLogger)
+
+	// Add test proposals
+	upgradeProposal := &Proposal{
+		ID:   "1",
+		Type: ProposalTypeUpgrade,
+	}
+	textProposal := &Proposal{
+		ID:   "2",
+		Type: ProposalTypeText,
+	}
+
+	tracker.proposals["1"] = upgradeProposal
+	tracker.proposals["2"] = textProposal
+
+	upgradeProposals, err := tracker.GetByType(ProposalTypeUpgrade)
+	assert.NoError(t, err)
+	assert.Len(t, upgradeProposals, 1)
+	assert.Equal(t, "1", upgradeProposals[0].ID)
+
+	textProposals, err := tracker.GetByType(ProposalTypeText)
+	assert.NoError(t, err)
+	assert.Len(t, textProposals, 1)
+	assert.Equal(t, "2", textProposals[0].ID)
+}
+
+func TestProposalTracker_GetProposalStats_Additional(t *testing.T) {
+	mockClient := &MockWBFTClient{}
+	testLogger := logger.NewTestLogger()
+	tracker := NewProposalTracker(mockClient, testLogger)
+
+	// Add test proposals
+	tracker.proposals["1"] = &Proposal{ID: "1", Status: ProposalStatusVoting, Type: ProposalTypeUpgrade}
+	tracker.proposals["2"] = &Proposal{ID: "2", Status: ProposalStatusPassed, Type: ProposalTypeText}
+	tracker.activeProposals["1"] = tracker.proposals["1"]
+	tracker.completedProposals["2"] = tracker.proposals["2"]
+
+	stats := tracker.GetProposalStats()
+
+	assert.NotNil(t, stats)
+	assert.Contains(t, stats, "total_proposals")
+}

@@ -462,3 +462,166 @@ func TestUpgradeScheduler_CleanupOld(t *testing.T) {
 	assert.Contains(t, scheduler.upgrades, "recent-upgrade")
 	assert.Len(t, scheduler.completedQueue, 1)
 }
+
+func TestUpgradeScheduler_Start(t *testing.T) {
+	cfg := &config.Config{Home: "/tmp/test"}
+	testLogger := logger.NewTestLogger()
+	scheduler := NewUpgradeScheduler(cfg, testLogger)
+
+	err := scheduler.Start()
+	assert.NoError(t, err)
+}
+
+func TestUpgradeScheduler_Stop(t *testing.T) {
+	cfg := &config.Config{Home: "/tmp/test"}
+	testLogger := logger.NewTestLogger()
+	scheduler := NewUpgradeScheduler(cfg, testLogger)
+
+	err := scheduler.Stop()
+	assert.NoError(t, err)
+}
+
+func TestUpgradeScheduler_LoadPersistedState(t *testing.T) {
+	cfg := &config.Config{Home: "/tmp/test"}
+	testLogger := logger.NewTestLogger()
+	scheduler := NewUpgradeScheduler(cfg, testLogger)
+
+	// Test loading when no state file exists
+	err := scheduler.loadPersistedState()
+	assert.NoError(t, err) // Should succeed even if file doesn't exist
+}
+
+func TestUpgradeScheduler_SaveCurrentState(t *testing.T) {
+	cfg := &config.Config{Home: "/tmp/test"}
+	testLogger := logger.NewTestLogger()
+	scheduler := NewUpgradeScheduler(cfg, testLogger)
+
+	// Add test upgrade
+	testUpgrade := &UpgradeInfo{
+		Name:   "test-upgrade",
+		Height: 1000,
+		Status: UpgradeStatusScheduled,
+	}
+	scheduler.upgrades["test-upgrade"] = testUpgrade
+	scheduler.scheduledQueue = []*UpgradeInfo{testUpgrade}
+
+	err := scheduler.saveCurrentState()
+	assert.NoError(t, err) // Should save state successfully
+}
+
+func TestUpgradeScheduler_SortScheduledQueue(t *testing.T) {
+	cfg := &config.Config{Home: "/tmp/test"}
+	testLogger := logger.NewTestLogger()
+	scheduler := NewUpgradeScheduler(cfg, testLogger)
+
+	// Add upgrades in wrong order
+	upgrade1 := &UpgradeInfo{Name: "upgrade1", Height: 2000}
+	upgrade2 := &UpgradeInfo{Name: "upgrade2", Height: 1000}
+	upgrade3 := &UpgradeInfo{Name: "upgrade3", Height: 1500}
+
+	scheduler.scheduledQueue = []*UpgradeInfo{upgrade1, upgrade2, upgrade3}
+
+	// Call sort method (this is a private method, so we test it indirectly)
+	scheduler.sortScheduledQueue()
+
+	// Verify the queue is sorted by height
+	assert.Equal(t, int64(1000), scheduler.scheduledQueue[0].Height)
+	assert.Equal(t, int64(1500), scheduler.scheduledQueue[1].Height)
+	assert.Equal(t, int64(2000), scheduler.scheduledQueue[2].Height)
+}
+
+func TestUpgradeScheduler_MoveToCompleted(t *testing.T) {
+	cfg := &config.Config{Home: "/tmp/test"}
+	testLogger := logger.NewTestLogger()
+	scheduler := NewUpgradeScheduler(cfg, testLogger)
+
+	testUpgrade := &UpgradeInfo{
+		Name:   "test-upgrade",
+		Height: 1000,
+		Status: UpgradeStatusCompleted,
+	}
+
+	scheduler.upgrades["test-upgrade"] = testUpgrade
+	scheduler.scheduledQueue = []*UpgradeInfo{testUpgrade}
+
+	// Call move to completed (private method, test indirectly)
+	scheduler.moveToCompleted(testUpgrade)
+
+	// Verify upgrade was moved from scheduled to completed
+	assert.Len(t, scheduler.scheduledQueue, 0)
+	assert.Len(t, scheduler.completedQueue, 1)
+	assert.Equal(t, testUpgrade, scheduler.completedQueue[0])
+}
+
+func TestUpgradeScheduler_UpdateStatus_Error(t *testing.T) {
+	cfg := &config.Config{Home: "/tmp/test"}
+	testLogger := logger.NewTestLogger()
+	scheduler := NewUpgradeScheduler(cfg, testLogger)
+
+	// Try to update status for non-existent upgrade
+	nonExistentUpgrade := &UpgradeInfo{
+		Name:   "non-existent",
+		Status: UpgradeStatusInProgress,
+	}
+
+	err := scheduler.UpdateStatus(nonExistentUpgrade)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "upgrade not found")
+}
+
+func TestUpgradeScheduler_CancelUpgrade_NotFound(t *testing.T) {
+	cfg := &config.Config{Home: "/tmp/test"}
+	testLogger := logger.NewTestLogger()
+	scheduler := NewUpgradeScheduler(cfg, testLogger)
+
+	err := scheduler.CancelUpgrade("non-existent")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "upgrade not found")
+}
+
+func TestUpgradeScheduler_ScheduleUpgrade_ValidationDisabled(t *testing.T) {
+	cfg := &config.Config{Home: "/tmp/test"}
+	testLogger := logger.NewTestLogger()
+	scheduler := NewUpgradeScheduler(cfg, testLogger)
+
+	// Test with validation disabled and invalid upgrade
+	scheduler.SetValidationEnabled(false)
+
+	invalidProposal := &Proposal{
+		ID:            "1",
+		Type:          ProposalTypeUpgrade,
+		UpgradeHeight: 0, // Invalid height
+		UpgradeInfo: &UpgradeInfo{
+			Name:   "", // Empty name
+			Height: 0,
+		},
+	}
+
+	// Should succeed even with invalid data when validation is disabled
+	err := scheduler.ScheduleUpgrade(invalidProposal)
+	assert.NoError(t, err)
+}
+
+func TestUpgradeScheduler_ScheduleUpgrade_ValidationEnabled(t *testing.T) {
+	cfg := &config.Config{Home: "/tmp/test"}
+	testLogger := logger.NewTestLogger()
+	scheduler := NewUpgradeScheduler(cfg, testLogger)
+
+	// Test with validation enabled
+	scheduler.SetValidationEnabled(true)
+
+	invalidProposal := &Proposal{
+		ID:            "1",
+		Type:          ProposalTypeUpgrade,
+		UpgradeHeight: 0, // Invalid height
+		UpgradeInfo: &UpgradeInfo{
+			Name:   "", // Empty name
+			Height: 0,
+		},
+	}
+
+	// Should fail with validation enabled
+	err := scheduler.ScheduleUpgrade(invalidProposal)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "upgrade name cannot be empty")
+}
