@@ -328,9 +328,7 @@ func TestWBFTClient_GetGovernanceProposals_Success(t *testing.T) {
 			"result": {
 				"proposals": [
 					{
-						"id": "1",
-						"title": "Test Proposal",
-						"description": "Test Description",
+						"proposal_id": "1",
 						"status": "PROPOSAL_STATUS_VOTING_PERIOD",
 						"submit_time": "2024-01-01T00:00:00Z",
 						"voting_start_time": "2024-01-01T00:00:00Z",
@@ -339,6 +337,12 @@ func TestWBFTClient_GetGovernanceProposals_Success(t *testing.T) {
 							"@type": "/cosmos.gov.v1.TextProposal",
 							"title": "Test Proposal",
 							"description": "Test Description"
+						},
+						"final_tally_result": {
+							"yes": "0",
+							"no": "0",
+							"abstain": "0",
+							"no_with_veto": "0"
 						}
 					}
 				]
@@ -370,11 +374,22 @@ func TestWBFTClient_GetProposal_Success(t *testing.T) {
 			"jsonrpc": "2.0",
 			"result": {
 				"proposal": {
-					"id": "1",
-					"title": "Test Proposal",
-					"description": "Test Description",
+					"proposal_id": "1",
 					"status": "PROPOSAL_STATUS_PASSED",
-					"submit_time": "2024-01-01T00:00:00Z"
+					"submit_time": "2024-01-01T00:00:00Z",
+					"voting_start_time": "2024-01-01T01:00:00Z",
+					"voting_end_time": "2024-01-03T01:00:00Z",
+					"content": {
+						"@type": "/cosmos.gov.v1.TextProposal",
+						"title": "Test Proposal",
+						"description": "Test Description"
+					},
+					"final_tally_result": {
+						"yes": "0",
+						"no": "0",
+						"abstain": "0",
+						"no_with_veto": "0"
+					}
 				}
 			},
 			"id": 1
@@ -404,25 +419,11 @@ func TestWBFTClient_GetValidators_Success(t *testing.T) {
 			"result": {
 				"validators": [
 					{
-						"operator_address": "wemixvaloper1abc",
-						"consensus_pubkey": {
-							"@type": "/cosmos.crypto.ed25519.PubKey",
-							"key": "base64key"
-						},
-						"status": "BOND_STATUS_BONDED",
-						"tokens": "1000000",
-						"delegator_shares": "1000000.000000000000000000",
-						"moniker": "Validator1",
-						"commission": {
-							"commission_rates": {
-								"rate": "0.100000000000000000"
-							}
-						}
+						"address": "wemixvaloper1abc",
+						"pub_key": "base64key",
+						"voting_power": "1000000"
 					}
-				],
-				"pagination": {
-					"total": "1"
-				}
+				]
 			},
 			"id": 1
 		}`
@@ -438,7 +439,8 @@ func TestWBFTClient_GetValidators_Success(t *testing.T) {
 	assert.NotNil(t, validators)
 	assert.Len(t, validators, 1)
 	assert.Equal(t, "wemixvaloper1abc", validators[0].OperatorAddress)
-	assert.Equal(t, "Validator1", validators[0].Moniker)
+	assert.Equal(t, "base64key", validators[0].ConsensusPubkey)
+	assert.Equal(t, int64(1000000), validators[0].VotingPower)
 }
 
 func TestWBFTClient_GetGovernanceParams_Success(t *testing.T) {
@@ -480,7 +482,7 @@ func TestWBFTClient_GetGovernanceParams_Success(t *testing.T) {
 	params, err := client.GetGovernanceParams()
 	assert.NoError(t, err)
 	assert.NotNil(t, params)
-	assert.Equal(t, "172800s", params.VotingPeriod)
+	assert.Equal(t, 172800*time.Second, params.VotingPeriod)
 	assert.Equal(t, "0.334000000000000000", params.QuorumThreshold)
 }
 
@@ -631,10 +633,10 @@ func TestWBFTClient_ParseProposalContent(t *testing.T) {
 	assert.NotNil(t, proposals[0].UpgradeInfo)
 	assert.Equal(t, "v2.0.0", proposals[0].UpgradeInfo.Name)
 
-	// Check parameter change proposal defaults to text for now
-	assert.Equal(t, ProposalTypeText, proposals[1].Type)
+	// Check parameter change proposal
+	assert.Equal(t, ProposalTypeParameter, proposals[1].Type)
 
-	// Check unknown type defaults to text
-	assert.Equal(t, ProposalTypeText, proposals[2].Type)
+	// Check unknown type defaults to community
+	assert.Equal(t, ProposalTypeCommunity, proposals[2].Type)
 }
 

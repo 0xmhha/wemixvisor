@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sort"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/wemix/wemixvisor/pkg/logger"
@@ -518,8 +519,12 @@ func (n *Notifier) countEnabledHandlers() int {
 }
 
 // generateNotificationID generates a unique notification ID
+// notificationCounter is used to ensure unique notification IDs
+var notificationCounter uint64
+
 func generateNotificationID() string {
-	return fmt.Sprintf("notif_%d", time.Now().UnixNano())
+	counter := atomic.AddUint64(&notificationCounter, 1)
+	return fmt.Sprintf("notif_%d_%d", time.Now().UnixNano(), counter)
 }
 
 // getDefaultPriorities returns default priority mappings for events

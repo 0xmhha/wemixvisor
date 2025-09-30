@@ -2,6 +2,9 @@ package governance
 
 import (
 	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
 	"time"
 )
 
@@ -209,10 +212,18 @@ func writeUpgradeInfo(path string, data map[string]interface{}) error {
 	return writeFile(path, jsonData)
 }
 
-// writeFile is a placeholder for file writing functionality
-// This should be implemented based on the project's file handling patterns
+// writeFile writes data to a file, creating parent directories if needed
 func writeFile(path string, data []byte) error {
-	// This will be implemented when we add file operations
-	// For now, return nil to satisfy the interface
+	// Create parent directory if it doesn't exist
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return fmt.Errorf("failed to create directory %s: %w", dir, err)
+	}
+
+	// Write the file
+	if err := os.WriteFile(path, data, 0644); err != nil {
+		return fmt.Errorf("failed to write file %s: %w", path, err)
+	}
+
 	return nil
 }

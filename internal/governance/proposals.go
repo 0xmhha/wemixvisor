@@ -45,12 +45,14 @@ func NewProposalTracker(client WBFTClientInterface, logger *logger.Logger) *Prop
 
 // Start begins tracking proposals
 func (pt *ProposalTracker) Start() error {
-	pt.mu.Lock()
-	defer pt.mu.Unlock()
-
 	pt.logger.Info("starting proposal tracker")
 
-	// Initial sync
+	// Set autoSync enabled before initial sync
+	pt.mu.Lock()
+	pt.enableAutoSync = true
+	pt.mu.Unlock()
+
+	// Initial sync (without holding lock)
 	if err := pt.syncProposals(); err != nil {
 		return fmt.Errorf("initial proposal sync failed: %w", err)
 	}

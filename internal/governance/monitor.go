@@ -387,6 +387,11 @@ func (m *Monitor) triggerUpgrade(upgrade *UpgradeInfo) error {
 		zap.String("path", upgradeInfoPath),
 		zap.String("name", upgrade.Name))
 
+	// Notify about the upgrade trigger
+	if m.notifier != nil {
+		m.notifier.NotifyUpgradeTriggered(upgrade)
+	}
+
 	return nil
 }
 
