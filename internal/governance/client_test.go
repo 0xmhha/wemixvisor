@@ -280,6 +280,210 @@ func TestWBFTClient_GetGovernanceParams(t *testing.T) {
 	})
 }
 
+func TestWBFTClient_GetBlock_Success(t *testing.T) {
+	testLogger := logger.NewTestLogger()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		response := `{
+			"jsonrpc": "2.0",
+			"result": {
+				"block": {
+					"header": {
+						"height": "1000",
+						"time": "2024-01-01T00:00:00Z",
+						"hash": "0xabc123"
+					},
+					"data": {
+						"txs": ["tx1", "tx2", "tx3"]
+					}
+				}
+			},
+			"id": 1
+		}`
+		w.Write([]byte(response))
+	}))
+	defer server.Close()
+
+	client, err := NewWBFTClient(server.URL, testLogger)
+	assert.NoError(t, err)
+
+	block, err := client.GetBlock(1000)
+	assert.NoError(t, err)
+	assert.NotNil(t, block)
+	assert.Equal(t, int64(1000), block.Height)
+	assert.Equal(t, "0xabc123", block.Hash)
+	assert.Equal(t, 3, block.TxCount)
+}
+
+func TestWBFTClient_GetGovernanceProposals_Success(t *testing.T) {
+	testLogger := logger.NewTestLogger()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		response := `{
+			"jsonrpc": "2.0",
+			"result": {
+				"proposals": [
+					{
+						"id": "1",
+						"title": "Test Proposal",
+						"description": "Test Description",
+						"status": "PROPOSAL_STATUS_VOTING_PERIOD",
+						"submit_time": "2024-01-01T00:00:00Z",
+						"voting_start_time": "2024-01-01T00:00:00Z",
+						"voting_end_time": "2024-01-02T00:00:00Z",
+						"content": {
+							"@type": "/cosmos.gov.v1.TextProposal",
+							"title": "Test Proposal",
+							"description": "Test Description"
+						}
+					}
+				]
+			},
+			"id": 1
+		}`
+		w.Write([]byte(response))
+	}))
+	defer server.Close()
+
+	client, err := NewWBFTClient(server.URL, testLogger)
+	assert.NoError(t, err)
+
+	proposals, err := client.GetGovernanceProposals(ProposalStatusVoting)
+	assert.NoError(t, err)
+	assert.NotNil(t, proposals)
+	assert.Len(t, proposals, 1)
+	assert.Equal(t, "1", proposals[0].ID)
+	assert.Equal(t, "Test Proposal", proposals[0].Title)
+}
+
+func TestWBFTClient_GetProposal_Success(t *testing.T) {
+	testLogger := logger.NewTestLogger()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		response := `{
+			"jsonrpc": "2.0",
+			"result": {
+				"proposal": {
+					"id": "1",
+					"title": "Test Proposal",
+					"description": "Test Description",
+					"status": "PROPOSAL_STATUS_PASSED",
+					"submit_time": "2024-01-01T00:00:00Z"
+				}
+			},
+			"id": 1
+		}`
+		w.Write([]byte(response))
+	}))
+	defer server.Close()
+
+	client, err := NewWBFTClient(server.URL, testLogger)
+	assert.NoError(t, err)
+
+	proposal, err := client.GetProposal("1")
+	assert.NoError(t, err)
+	assert.NotNil(t, proposal)
+	assert.Equal(t, "1", proposal.ID)
+	assert.Equal(t, "Test Proposal", proposal.Title)
+}
+
+func TestWBFTClient_GetValidators_Success(t *testing.T) {
+	testLogger := logger.NewTestLogger()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		response := `{
+			"jsonrpc": "2.0",
+			"result": {
+				"validators": [
+					{
+						"operator_address": "wemixvaloper1abc",
+						"consensus_pubkey": {
+							"@type": "/cosmos.crypto.ed25519.PubKey",
+							"key": "base64key"
+						},
+						"status": "BOND_STATUS_BONDED",
+						"tokens": "1000000",
+						"delegator_shares": "1000000.000000000000000000",
+						"moniker": "Validator1",
+						"commission": {
+							"commission_rates": {
+								"rate": "0.100000000000000000"
+							}
+						}
+					}
+				],
+				"pagination": {
+					"total": "1"
+				}
+			},
+			"id": 1
+		}`
+		w.Write([]byte(response))
+	}))
+	defer server.Close()
+
+	client, err := NewWBFTClient(server.URL, testLogger)
+	assert.NoError(t, err)
+
+	validators, err := client.GetValidators()
+	assert.NoError(t, err)
+	assert.NotNil(t, validators)
+	assert.Len(t, validators, 1)
+	assert.Equal(t, "wemixvaloper1abc", validators[0].OperatorAddress)
+	assert.Equal(t, "Validator1", validators[0].Moniker)
+}
+
+func TestWBFTClient_GetGovernanceParams_Success(t *testing.T) {
+	testLogger := logger.NewTestLogger()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		response := `{
+			"jsonrpc": "2.0",
+			"result": {
+				"voting_params": {
+					"voting_period": "172800s"
+				},
+				"deposit_params": {
+					"min_deposit": [
+						{
+							"denom": "uwemix",
+							"amount": "10000000"
+						}
+					],
+					"max_deposit_period": "172800s"
+				},
+				"tally_params": {
+					"quorum": "0.334000000000000000",
+					"threshold": "0.500000000000000000",
+					"veto_threshold": "0.334000000000000000"
+				}
+			},
+			"id": 1
+		}`
+		w.Write([]byte(response))
+	}))
+	defer server.Close()
+
+	client, err := NewWBFTClient(server.URL, testLogger)
+	assert.NoError(t, err)
+
+	params, err := client.GetGovernanceParams()
+	assert.NoError(t, err)
+	assert.NotNil(t, params)
+	assert.Equal(t, "172800s", params.VotingPeriod)
+	assert.Equal(t, "0.334000000000000000", params.QuorumThreshold)
+}
+
 func TestWBFTClient_NetworkError(t *testing.T) {
 	testLogger := logger.NewTestLogger()
 
@@ -320,5 +524,117 @@ func TestWBFTClient_NetworkError(t *testing.T) {
 		_, err := client.GetGovernanceParams()
 		assert.Error(t, err)
 	})
+}
+
+func TestWBFTClient_MakeRequest_Error(t *testing.T) {
+	testLogger := logger.NewTestLogger()
+
+	t.Run("JSON RPC Error Response", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			response := `{
+				"jsonrpc": "2.0",
+				"error": {
+					"code": -32700,
+					"message": "Parse error"
+				},
+				"id": 1
+			}`
+			w.Write([]byte(response))
+		}))
+		defer server.Close()
+
+		client, err := NewWBFTClient(server.URL, testLogger)
+		assert.NoError(t, err)
+
+		_, err = client.GetCurrentHeight()
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "Parse error")
+	})
+
+	t.Run("HTTP Error Status", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusInternalServerError)
+		}))
+		defer server.Close()
+
+		client, err := NewWBFTClient(server.URL, testLogger)
+		assert.NoError(t, err)
+
+		_, err = client.GetCurrentHeight()
+		assert.Error(t, err)
+	})
+}
+
+func TestWBFTClient_ParseProposalContent(t *testing.T) {
+	testLogger := logger.NewTestLogger()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		response := `{
+			"jsonrpc": "2.0",
+			"result": {
+				"proposals": [
+					{
+						"id": "1",
+						"title": "Software Upgrade",
+						"content": {
+							"@type": "/cosmos.upgrade.v1beta1.SoftwareUpgradeProposal",
+							"plan": {
+								"name": "v2.0.0",
+								"height": "10000",
+								"info": "{\"binaries\":{\"linux\":{\"url\":\"https://example.com/binary\",\"checksum\":\"sha256:abc123\"}}}"
+							}
+						}
+					},
+					{
+						"id": "2",
+						"title": "Parameter Change",
+						"content": {
+							"@type": "/cosmos.params.v1beta1.ParameterChangeProposal",
+							"changes": [
+								{
+									"subspace": "staking",
+									"key": "MaxValidators",
+									"value": "100"
+								}
+							]
+						}
+					},
+					{
+						"id": "3",
+						"title": "Unknown Type",
+						"content": {
+							"@type": "/unknown.type",
+							"data": "test"
+						}
+					}
+				]
+			},
+			"id": 1
+		}`
+		w.Write([]byte(response))
+	}))
+	defer server.Close()
+
+	client, err := NewWBFTClient(server.URL, testLogger)
+	assert.NoError(t, err)
+
+	proposals, err := client.GetGovernanceProposals(ProposalStatusSubmitted)
+	assert.NoError(t, err)
+	assert.Len(t, proposals, 3)
+
+	// Check software upgrade proposal
+	assert.Equal(t, ProposalTypeUpgrade, proposals[0].Type)
+	assert.NotNil(t, proposals[0].UpgradeInfo)
+	assert.Equal(t, "v2.0.0", proposals[0].UpgradeInfo.Name)
+
+	// Check parameter change proposal defaults to text for now
+	assert.Equal(t, ProposalTypeText, proposals[1].Type)
+
+	// Check unknown type defaults to text
+	assert.Equal(t, ProposalTypeText, proposals[2].Type)
 }
 

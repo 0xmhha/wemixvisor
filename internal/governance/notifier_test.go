@@ -1,6 +1,8 @@
 package governance
 
 import (
+	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -729,16 +731,26 @@ func TestNotifier_ConcurrentNotifications(t *testing.T) {
 	handler.On("Handle", mock.AnythingOfType("*governance.Notification")).Return(nil)
 	notifier.AddHandler(handler)
 
-	// Send multiple notifications concurrently
+	// Send multiple notifications concurrently with different proposals
 	numNotifications := 10
-	proposal := &Proposal{ID: "1", Title: "Test", Type: ProposalTypeText}
+	var wg sync.WaitGroup
+	wg.Add(numNotifications)
 
 	for i := 0; i < numNotifications; i++ {
-		go notifier.NotifyNewProposal(proposal)
+		go func(index int) {
+			defer wg.Done()
+			proposal := &Proposal{
+				ID:    fmt.Sprintf("%d", index),
+				Title: fmt.Sprintf("Test %d", index),
+				Type:  ProposalTypeText,
+			}
+			notifier.NotifyNewProposal(proposal)
+		}(i)
 	}
 
-	// Give time for all goroutines to complete
-	time.Sleep(100 * time.Millisecond)
+	// Wait for all goroutines to complete
+	wg.Wait()
+	time.Sleep(50 * time.Millisecond) // Give handlers time to complete
 
 	// Should have created all notifications
 	assert.Len(t, notifier.notifications, numNotifications)
