@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2025-09-30
+
+### Added
+- Comprehensive configuration management system
+- Hot-reload configuration support with file watching
+- Template system for network configurations
+- Configuration validation framework
+- Version migration system (v0.1.0 to v0.5.0)
+- CLI commands for configuration management
+- Multi-format configuration support (TOML, YAML, JSON)
+
+### Features
+- ConfigManager with automatic reload on file changes
+- 6 built-in network templates (mainnet, testnet, devnet, validator, archive, rpc)
+- 7 validation rules for configuration integrity
+- Automatic configuration migration between versions
+- Backup and restore functionality for configurations
+- Real-time configuration update notifications
+- Merged configuration from multiple sources
+
+### CLI Commands
+- `config show` - Display current configuration
+- `config set` - Update configuration values
+- `config validate` - Validate configuration
+- `config template` - Apply configuration templates
+- `config migrate` - Migrate configuration versions
+- `backup create/list/restore/clean` - Backup management
+- `init` - Initialize wemixvisor with templates
+- `start/stop/restart/status` - Process management
+- `version` - Show version information
+
+### Improved
+- Configuration structure with separate Wemixvisor and Node configs
+- Error handling with detailed validation messages
+- Test coverage reaching 82.4% for config package
+
 ## [0.3.0] - 2025-09-26
 
 ### Added
