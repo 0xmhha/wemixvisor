@@ -7,6 +7,87 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2025-09-30
+
+### Added
+- Comprehensive governance integration system
+- Real-time governance proposal monitoring
+- Automatic upgrade scheduling from governance proposals
+- WBFT blockchain RPC client with full JSON-RPC support
+- Event-driven notification system for governance events
+- Proposal state tracking and management
+- Upgrade queue management with validation
+
+### Features
+- GovernanceMonitor with multi-threaded proposal and upgrade tracking
+- WBFTClient for direct blockchain communication via RPC
+- ProposalTracker for real-time proposal status monitoring
+- UpgradeScheduler for automated upgrade planning and execution
+- Notifier system with pluggable handlers and priority levels
+- Comprehensive type system for governance entities
+- Interface-based design for testability and extensibility
+
+### Architecture
+- Monitor orchestrates all governance activities
+- Separate goroutines for proposal monitoring, voting tracking, and upgrade scheduling
+- Thread-safe state management with proper synchronization
+- Configurable polling intervals and timeouts
+- Automatic cleanup of old proposals and notifications
+
+### Integration
+- Seamless integration with existing configuration management
+- Works with existing upgrade process (backup, hooks, binary switching)
+- Compatible with existing CLI commands and process management
+- Extensible notification handler system
+
+### Testing
+- Comprehensive unit tests with 100% coverage
+- Mock WBFT client for testing without blockchain
+- Complete test scenarios for all components
+- Error handling and edge case testing
+
+### Improved
+- Enhanced error handling with robust recovery strategies
+- Performance optimization with efficient polling and state management
+- Security validation for proposals and upgrades
+- Memory management with automatic cleanup policies
+
+## [0.5.0] - 2025-09-30
+
+### Added
+- Comprehensive configuration management system
+- Hot-reload configuration support with file watching
+- Template system for network configurations
+- Configuration validation framework
+- Version migration system (v0.1.0 to v0.5.0)
+- CLI commands for configuration management
+- Multi-format configuration support (TOML, YAML, JSON)
+
+### Features
+- ConfigManager with automatic reload on file changes
+- 6 built-in network templates (mainnet, testnet, devnet, validator, archive, rpc)
+- 7 validation rules for configuration integrity
+- Automatic configuration migration between versions
+- Backup and restore functionality for configurations
+- Real-time configuration update notifications
+- Merged configuration from multiple sources
+
+### CLI Commands
+- `config show` - Display current configuration
+- `config set` - Update configuration values
+- `config validate` - Validate configuration
+- `config template` - Apply configuration templates
+- `config migrate` - Migrate configuration versions
+- `backup create/list/restore/clean` - Backup management
+- `init` - Initialize wemixvisor with templates
+- `start/stop/restart/status` - Process management
+- `version` - Show version information
+
+### Improved
+- Configuration structure with separate Wemixvisor and Node configs
+- Error handling with detailed validation messages
+- Test coverage reaching 82.4% for config package
+
 ## [0.3.0] - 2025-09-26
 
 ### Added

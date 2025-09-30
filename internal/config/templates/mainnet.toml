@@ -1,0 +1,18 @@
+# WEMIX3.0 Mainnet Configuration Template
+name = "mainnet"
+description = "WEMIX3.0 Mainnet configuration"
+network = "mainnet"
+
+[values]
+network_id = 1111
+chain_id = "1111"
+rpc_port = 8588
+ws_port = 8598
+p2p_port = 8589
+max_peers = 50
+validator_mode = false
+data_dir = "~/.wemix/mainnet"
+
+[values.bootnodes]
+boot1 = "enode://abc123...@mainnet-boot1.wemix.com:8589"
+boot2 = "enode://def456...@mainnet-boot2.wemix.com:8589"
