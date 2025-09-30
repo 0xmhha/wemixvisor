@@ -7,6 +7,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2025-09-30
+
+### Added
+- Comprehensive governance integration system
+- Real-time governance proposal monitoring
+- Automatic upgrade scheduling from governance proposals
+- WBFT blockchain RPC client with full JSON-RPC support
+- Event-driven notification system for governance events
+- Proposal state tracking and management
+- Upgrade queue management with validation
+
+### Features
+- GovernanceMonitor with multi-threaded proposal and upgrade tracking
+- WBFTClient for direct blockchain communication via RPC
+- ProposalTracker for real-time proposal status monitoring
+- UpgradeScheduler for automated upgrade planning and execution
+- Notifier system with pluggable handlers and priority levels
+- Comprehensive type system for governance entities
+- Interface-based design for testability and extensibility
+
+### Architecture
+- Monitor orchestrates all governance activities
+- Separate goroutines for proposal monitoring, voting tracking, and upgrade scheduling
+- Thread-safe state management with proper synchronization
+- Configurable polling intervals and timeouts
+- Automatic cleanup of old proposals and notifications
+
+### Integration
+- Seamless integration with existing configuration management
+- Works with existing upgrade process (backup, hooks, binary switching)
+- Compatible with existing CLI commands and process management
+- Extensible notification handler system
+
+### Testing
+- Comprehensive unit tests with 100% coverage
+- Mock WBFT client for testing without blockchain
+- Complete test scenarios for all components
+- Error handling and edge case testing
+
+### Improved
+- Enhanced error handling with robust recovery strategies
+- Performance optimization with efficient polling and state management
+- Security validation for proposals and upgrades
+- Memory management with automatic cleanup policies
+
 ## [0.5.0] - 2025-09-30
 
 ### Added
