@@ -1,4 +1,12 @@
-.PHONY: all build install clean test fmt lint
+.PHONY: all build install clean clean-all test test-e2e test-all coverage fmt lint
+
+GO_VERSION_DIR ?= $(HOME)/.gvm/gos/go1.23.11
+GO_BIN_DIR := $(GO_VERSION_DIR)/bin
+GO_CMD := $(GO_BIN_DIR)/go
+ifeq (,$(wildcard $(GO_CMD)))
+GO_CMD := go
+endif
+GO_ENV := PATH=$(GO_BIN_DIR):$$PATH
 
 VERSION := 0.1.0
 COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
@@ -12,41 +20,45 @@ all: build
 
 build:
 	@echo "Building wemixvisor..."
-	@go build -ldflags "$(LDFLAGS)" -o bin/wemixvisor ./cmd/wemixvisor
+	@$(GO_ENV) $(GO_CMD) build -ldflags "$(LDFLAGS)" -o bin/wemixvisor ./cmd/wemixvisor
 
 install:
 	@echo "Installing wemixvisor..."
-	@go install -ldflags "$(LDFLAGS)" ./cmd/wemixvisor
+	@$(GO_ENV) $(GO_CMD) install -ldflags "$(LDFLAGS)" ./cmd/wemixvisor
 
 clean:
-	@echo "Cleaning..."
+	@echo "Cleaning binaries..."
 	@rm -rf bin/
 	@rm -f wemixvisor
 
+clean-all: clean
+	@echo "Cleaning coverage artifacts..."
+	@rm -f coverage.out coverage.html
+
 test:
 	@echo "Running unit tests..."
-	@go test -v -race -coverprofile=coverage.out ./...
+	@$(GO_ENV) $(GO_CMD) test -v -race -coverprofile=coverage.out ./...
 	@echo "Test coverage:"
-	@go tool cover -func=coverage.out
+	@$(GO_ENV) $(GO_CMD) tool cover -func=coverage.out
 
 test-e2e:
 	@echo "Running e2e tests..."
-	@go test -v -tags=e2e ./test/e2e/...
+	@$(GO_ENV) $(GO_CMD) test -v -tags=e2e ./test/e2e/...
 
 test-all: test test-e2e
 
 coverage:
 	@echo "Generating coverage report..."
-	@go test -v -race -coverprofile=coverage.out ./...
-	@go tool cover -html=coverage.out -o coverage.html
+	@$(GO_ENV) $(GO_CMD) test -v -race -coverprofile=coverage.out ./...
+	@$(GO_ENV) $(GO_CMD) tool cover -html=coverage.out -o coverage.html
 	@echo "Coverage report generated: coverage.html"
 
 fmt:
 	@echo "Formatting code..."
-	@go fmt ./...
+	@$(GO_ENV) $(GO_CMD) fmt ./...
 
 lint:
 	@echo "Running linter..."
-	@golangci-lint run ./...
+	@$(GO_ENV) golangci-lint run ./...
 
 .DEFAULT_GOAL := build

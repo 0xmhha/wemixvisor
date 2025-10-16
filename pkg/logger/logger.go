@@ -1,6 +1,7 @@
 package logger
 
 import (
+	"fmt"
 	"os"
 
 	"go.uber.org/zap"
@@ -26,7 +27,6 @@ func New(colorLogs bool, disableLogs bool, timeFormat string) (*Logger, error) {
 		config = zap.NewProductionConfig()
 	}
 
-	// Set time format
 	switch timeFormat {
 	case "kitchen":
 		config.EncoderConfig.EncodeTime = zapcore.TimeEncoderOfLayout("3:04PM")
@@ -38,7 +38,6 @@ func New(colorLogs bool, disableLogs bool, timeFormat string) (*Logger, error) {
 		config.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
 	}
 
-	// Always output to stdout
 	config.OutputPaths = []string{"stdout"}
 	config.ErrorOutputPaths = []string{"stderr"}
 
@@ -51,32 +50,69 @@ func New(colorLogs bool, disableLogs bool, timeFormat string) (*Logger, error) {
 }
 
 // Info logs an info message
-func (l *Logger) Info(msg string, fields ...zap.Field) {
-	l.Logger.Info(msg, fields...)
+func (l *Logger) Info(msg string, args ...interface{}) {
+	l.Logger.Info(msg, toZapFields(args...)...)
 }
 
 // Error logs an error message
-func (l *Logger) Error(msg string, fields ...zap.Field) {
-	l.Logger.Error(msg, fields...)
+func (l *Logger) Error(msg string, args ...interface{}) {
+	l.Logger.Error(msg, toZapFields(args...)...)
 }
 
 // Warn logs a warning message
-func (l *Logger) Warn(msg string, fields ...zap.Field) {
-	l.Logger.Warn(msg, fields...)
+func (l *Logger) Warn(msg string, args ...interface{}) {
+	l.Logger.Warn(msg, toZapFields(args...)...)
 }
 
 // Debug logs a debug message
-func (l *Logger) Debug(msg string, fields ...zap.Field) {
-	l.Logger.Debug(msg, fields...)
+func (l *Logger) Debug(msg string, args ...interface{}) {
+	l.Logger.Debug(msg, toZapFields(args...)...)
 }
 
 // Fatal logs a fatal message and exits
-func (l *Logger) Fatal(msg string, fields ...zap.Field) {
-	l.Logger.Fatal(msg, fields...)
+func (l *Logger) Fatal(msg string, args ...interface{}) {
+	l.Logger.Fatal(msg, toZapFields(args...)...)
 	os.Exit(1)
 }
 
 // With creates a child logger with additional fields
 func (l *Logger) With(fields ...zap.Field) *Logger {
 	return &Logger{l.Logger.With(fields...)}
+}
+
+func toZapFields(args ...interface{}) []zap.Field {
+	if len(args) == 0 {
+		return nil
+	}
+
+	if field, ok := args[0].(zap.Field); ok {
+		fields := make([]zap.Field, 0, len(args))
+		fields = append(fields, field)
+		for i := 1; i < len(args); i++ {
+			if f, ok := args[i].(zap.Field); ok {
+				fields = append(fields, f)
+			}
+		}
+		return fields
+	}
+
+	fields := make([]zap.Field, 0, len(args)/2)
+	for i := 0; i < len(args); {
+		if i+1 >= len(args) {
+			fields = append(fields, zap.Any(fmt.Sprintf("arg_%d", i), args[i]))
+			break
+		}
+
+		key, ok := args[i].(string)
+		if !ok {
+			fields = append(fields, zap.Any(fmt.Sprintf("arg_%d", i), args[i]))
+			i++
+			continue
+		}
+
+		fields = append(fields, zap.Any(key, args[i+1]))
+		i += 2
+	}
+
+	return fields
 }

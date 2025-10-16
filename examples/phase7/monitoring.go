@@ -1,3 +1,6 @@
+//go:build ignore
+// +build ignore
+
 package main
 
 import (
@@ -268,9 +271,9 @@ func (a *AlertMonitor) CheckAlerts() {
 	fmt.Println("\n=== Alert Check ===")
 
 	// Simulate metric values
-	cpuUsage := float64(time.Now().Unix()%100)
-	memoryUsage := float64((time.Now().Unix()+20)%100)
-	diskUsage := float64((time.Now().Unix()+40)%100)
+	cpuUsage := float64(time.Now().Unix() % 100)
+	memoryUsage := float64((time.Now().Unix() + 20) % 100)
+	diskUsage := float64((time.Now().Unix() + 40) % 100)
 
 	// Check CPU usage
 	if cpuUsage > a.thresholds["cpu_usage"] {

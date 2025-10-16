@@ -350,6 +350,7 @@ func TestPortValidationRule(t *testing.T) {
 		name    string
 		config  *Config
 		wantErr bool
+		stub    func(int) bool
 	}{
 		{
 			name: "valid port",
@@ -372,10 +373,24 @@ func TestPortValidationRule(t *testing.T) {
 			},
 			wantErr: true,
 		},
+		{
+			name: "port in use",
+			config: &Config{
+				RPCPort: 8545,
+			},
+			wantErr: true,
+			stub:    func(int) bool { return false },
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			if tt.stub != nil {
+				prev := portAvailabilityCheck
+				portAvailabilityCheck = tt.stub
+				t.Cleanup(func() { portAvailabilityCheck = prev })
+			}
+
 			err := rule.Validate(tt.config)
 			if tt.wantErr {
 				assert.Error(t, err)
@@ -450,12 +465,12 @@ func TestResourceValidationRule(t *testing.T) {
 		{
 			name: "valid resources",
 			config: &Config{
-				ShutdownGrace:       30 * time.Second,
-				PollInterval:        1 * time.Second,
-				RestartDelay:        5 * time.Second,
-				HealthCheckInterval: 30 * time.Second,
-				MetricsInterval:     60 * time.Second,
-				MaxRestarts:         5,
+				ShutdownGrace:        30 * time.Second,
+				PollInterval:         1 * time.Second,
+				RestartDelay:         5 * time.Second,
+				HealthCheckInterval:  30 * time.Second,
+				MetricsInterval:      60 * time.Second,
+				MaxRestarts:          5,
 				PreUpgradeMaxRetries: 3,
 			},
 			wantErr: false,

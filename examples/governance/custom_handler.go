@@ -1,3 +1,6 @@
+//go:build ignore
+// +build ignore
+
 // Package main demonstrates custom notification handler implementation
 package main
 

@@ -1,3 +1,6 @@
+//go:build ignore
+// +build ignore
+
 package main
 
 import (
@@ -173,15 +176,15 @@ func demonstrateWorkerPool(logger *logger.Logger) {
 // demonstrateOptimizer shows full optimizer usage
 func demonstrateOptimizer(logger *logger.Logger) {
 	config := &performance.OptimizerConfig{
-		EnableCaching:    true,
-		CacheSize:        100,
-		CacheTTL:         5 * time.Minute,
-		EnablePooling:    true,
-		MaxConnections:   10,
-		MaxWorkers:       5,
-		EnableGCTuning:   true,
-		GCPercent:        100,
-		EnableProfiling:  false,
+		EnableCaching:   true,
+		CacheSize:       100,
+		CacheTTL:        5 * time.Minute,
+		EnablePooling:   true,
+		MaxConnections:  10,
+		MaxWorkers:      5,
+		EnableGCTuning:  true,
+		GCPercent:       100,
+		EnableProfiling: false,
 	}
 
 	optimizer := performance.NewOptimizer(config, logger)
@@ -265,8 +268,8 @@ type mockConn struct {
 	mu     sync.Mutex
 }
 
-func (m *mockConn) Read(b []byte) (n int, err error)   { return 0, nil }
-func (m *mockConn) Write(b []byte) (n int, err error)  { return len(b), nil }
+func (m *mockConn) Read(b []byte) (n int, err error)  { return 0, nil }
+func (m *mockConn) Write(b []byte) (n int, err error) { return len(b), nil }
 func (m *mockConn) Close() error {
 	m.mu.Lock()
 	m.closed = true

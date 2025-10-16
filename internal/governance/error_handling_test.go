@@ -3,7 +3,6 @@ package governance
 import (
 	"context"
 	"net/http"
-	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -16,7 +15,7 @@ import (
 func TestWBFTClient_GetCurrentHeight_InvalidJSON(t *testing.T) {
 	testLogger := logger.NewTestLogger()
 
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := newTestServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		// Send malformed JSON in result
@@ -40,7 +39,7 @@ func TestWBFTClient_GetCurrentHeight_InvalidJSON(t *testing.T) {
 func TestWBFTClient_GetCurrentHeight_InvalidHeightFormat(t *testing.T) {
 	testLogger := logger.NewTestLogger()
 
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := newTestServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		// Send non-numeric height
@@ -68,7 +67,7 @@ func TestWBFTClient_GetCurrentHeight_InvalidHeightFormat(t *testing.T) {
 func TestWBFTClient_GetBlock_InvalidJSON(t *testing.T) {
 	testLogger := logger.NewTestLogger()
 
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := newTestServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		// Send malformed JSON
@@ -92,7 +91,7 @@ func TestWBFTClient_GetBlock_InvalidJSON(t *testing.T) {
 func TestWBFTClient_GetGovernanceProposals_InvalidJSON(t *testing.T) {
 	testLogger := logger.NewTestLogger()
 
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := newTestServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		// Send invalid JSON structure
@@ -116,7 +115,7 @@ func TestWBFTClient_GetGovernanceProposals_InvalidJSON(t *testing.T) {
 func TestWBFTClient_GetProposal_InvalidJSON(t *testing.T) {
 	testLogger := logger.NewTestLogger()
 
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := newTestServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		// Send invalid JSON structure
@@ -140,7 +139,7 @@ func TestWBFTClient_GetProposal_InvalidJSON(t *testing.T) {
 func TestWBFTClient_GetValidators_InvalidJSON(t *testing.T) {
 	testLogger := logger.NewTestLogger()
 
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := newTestServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		// Send invalid JSON structure
@@ -164,7 +163,7 @@ func TestWBFTClient_GetValidators_InvalidJSON(t *testing.T) {
 func TestWBFTClient_GetValidators_InvalidVotingPower(t *testing.T) {
 	testLogger := logger.NewTestLogger()
 
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := newTestServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		// Send non-numeric voting power
@@ -198,7 +197,7 @@ func TestWBFTClient_GetValidators_InvalidVotingPower(t *testing.T) {
 func TestWBFTClient_GetGovernanceParams_InvalidJSON(t *testing.T) {
 	testLogger := logger.NewTestLogger()
 
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := newTestServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		// Send invalid JSON structure
@@ -222,7 +221,7 @@ func TestWBFTClient_GetGovernanceParams_InvalidJSON(t *testing.T) {
 func TestWBFTClient_GetGovernanceParams_InvalidDuration(t *testing.T) {
 	testLogger := logger.NewTestLogger()
 
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := newTestServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		// Send invalid duration format
@@ -259,7 +258,7 @@ func TestWBFTClient_GetGovernanceParams_InvalidDuration(t *testing.T) {
 func TestWBFTClient_MakeRequest_InvalidJSON(t *testing.T) {
 	testLogger := logger.NewTestLogger()
 
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := newTestServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		// Send completely invalid JSON
@@ -279,7 +278,7 @@ func TestWBFTClient_MakeRequest_InvalidJSON(t *testing.T) {
 func TestWBFTClient_MakeRequest_EmptyResponse(t *testing.T) {
 	testLogger := logger.NewTestLogger()
 
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := newTestServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		// Send empty response
@@ -300,7 +299,7 @@ func TestWBFTClient_MakeRequest_EmptyResponse(t *testing.T) {
 func TestWBFTClient_ParseProposalContent_ParameterType(t *testing.T) {
 	testLogger := logger.NewTestLogger()
 
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := newTestServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		response := `{
