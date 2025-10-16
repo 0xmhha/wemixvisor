@@ -46,7 +46,6 @@ func (e *Exporter) Start() error {
 		promhttp.HandlerOpts{
 			EnableOpenMetrics: true,
 			Timeout:           10 * time.Second,
-			ErrorLog:          e.logger.StdLogger(),
 		},
 	)
 	mux.Handle(e.path, handler)
