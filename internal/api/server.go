@@ -2,12 +2,15 @@ package api
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	"github.com/gorilla/websocket"
 	"github.com/wemix/wemixvisor/internal/config"
 	"github.com/wemix/wemixvisor/internal/governance"
 	"github.com/wemix/wemixvisor/internal/metrics"
@@ -24,6 +27,34 @@ type Server struct {
 	collector *metrics.Collector
 	auth      *AuthMiddleware
 	port      int
+
+	// WebSocket management
+	wsClients   map[*websocket.Conn]*WSClient
+	wsClientsMu sync.RWMutex
+	wsBroadcast chan WSMessage
+	wsUpgrader  websocket.Upgrader
+}
+
+// WSClient represents a WebSocket client connection
+type WSClient struct {
+	conn          *websocket.Conn
+	send          chan []byte
+	subscriptions map[string]bool // topic -> subscribed
+	mu            sync.RWMutex
+}
+
+// WSMessage represents a WebSocket message
+type WSMessage struct {
+	Type    string      `json:"type"`
+	Topic   string      `json:"topic"`
+	Data    interface{} `json:"data"`
+	Time    int64       `json:"timestamp"`
+}
+
+// WSSubscribeRequest represents a subscription request
+type WSSubscribeRequest struct {
+	Action string   `json:"action"` // "subscribe" or "unsubscribe"
+	Topics []string `json:"topics"` // ["metrics", "logs", "alerts", "proposals"]
 }
 
 // NewServer creates a new API server
@@ -59,16 +90,28 @@ func NewServer(cfg *config.Config, monitor *governance.Monitor, collector *metri
 	}
 
 	server := &Server{
-		router:    router,
-		logger:    logger,
-		config:    cfg,
-		monitor:   monitor,
-		collector: collector,
-		port:      port,
+		router:      router,
+		logger:      logger,
+		config:      cfg,
+		monitor:     monitor,
+		collector:   collector,
+		port:        port,
+		wsClients:   make(map[*websocket.Conn]*WSClient),
+		wsBroadcast: make(chan WSMessage, 256),
+		wsUpgrader: websocket.Upgrader{
+			ReadBufferSize:  1024,
+			WriteBufferSize: 1024,
+			CheckOrigin: func(r *http.Request) bool {
+				return true // Allow all origins in development
+			},
+		},
 	}
 
 	// Setup routes
 	server.setupRoutes()
+
+	// Start WebSocket broadcast handler
+	go server.handleWSBroadcast()
 
 	return server
 }
@@ -346,15 +389,25 @@ func (s *Server) getProposal(c *gin.Context) {
 		return
 	}
 
-	proposal, err := s.monitor.GetProposalByID(proposalID)
+	proposals, err := s.monitor.GetProposals()
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{
-			"error": "Proposal not found",
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": err.Error(),
 		})
 		return
 	}
 
-	c.JSON(http.StatusOK, proposal)
+	// Find proposal by ID
+	for _, proposal := range proposals {
+		if proposal.ID == proposalID {
+			c.JSON(http.StatusOK, proposal)
+			return
+		}
+	}
+
+	c.JSON(http.StatusNotFound, gin.H{
+		"error": "Proposal not found",
+	})
 }
 
 // getVotes returns voting statistics
@@ -463,10 +516,269 @@ func (s *Server) streamLogs(c *gin.Context) {
 
 // handleWebSocket handles WebSocket connections
 func (s *Server) handleWebSocket(c *gin.Context) {
-	// WebSocket implementation would go here
-	c.JSON(http.StatusNotImplemented, gin.H{
-		"error": "WebSocket support not yet implemented",
+	// Upgrade HTTP connection to WebSocket
+	conn, err := s.wsUpgrader.Upgrade(c.Writer, c.Request, nil)
+	if err != nil {
+		s.logger.Error("Failed to upgrade WebSocket connection", "error", err.Error())
+		return
+	}
+
+	// Create new client
+	client := &WSClient{
+		conn:          conn,
+		send:          make(chan []byte, 256),
+		subscriptions: make(map[string]bool),
+	}
+
+	// Register client
+	s.wsClientsMu.Lock()
+	s.wsClients[conn] = client
+	s.wsClientsMu.Unlock()
+
+	s.logger.Info("WebSocket client connected", "remote_addr", conn.RemoteAddr().String())
+
+	// Send welcome message
+	welcome := WSMessage{
+		Type:  "connected",
+		Topic: "system",
+		Data: map[string]interface{}{
+			"message": "Connected to Wemixvisor API",
+			"version": "0.7.0",
+			"topics":  []string{"metrics", "logs", "alerts", "proposals"},
+		},
+		Time: time.Now().Unix(),
+	}
+	client.writeMessage(welcome)
+
+	// Start client handlers
+	go s.handleWSRead(client)
+	go s.handleWSWrite(client)
+}
+
+// handleWSRead reads messages from WebSocket client
+func (s *Server) handleWSRead(client *WSClient) {
+	defer func() {
+		s.removeWSClient(client)
+		client.conn.Close()
+	}()
+
+	client.conn.SetReadDeadline(time.Now().Add(60 * time.Second))
+	client.conn.SetPongHandler(func(string) error {
+		client.conn.SetReadDeadline(time.Now().Add(60 * time.Second))
+		return nil
 	})
+
+	for {
+		_, message, err := client.conn.ReadMessage()
+		if err != nil {
+			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
+				s.logger.Error("WebSocket read error", "error", err.Error())
+			}
+			break
+		}
+
+		// Parse subscription request
+		var req WSSubscribeRequest
+		if err := json.Unmarshal(message, &req); err != nil {
+			s.logger.Warn("Invalid WebSocket message", "error", err.Error())
+			continue
+		}
+
+		// Handle subscription
+		s.handleWSSubscription(client, &req)
+	}
+}
+
+// handleWSWrite writes messages to WebSocket client
+func (s *Server) handleWSWrite(client *WSClient) {
+	ticker := time.NewTicker(30 * time.Second)
+	defer func() {
+		ticker.Stop()
+		client.conn.Close()
+	}()
+
+	for {
+		select {
+		case message, ok := <-client.send:
+			client.conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
+			if !ok {
+				client.conn.WriteMessage(websocket.CloseMessage, []byte{})
+				return
+			}
+
+			if err := client.conn.WriteMessage(websocket.TextMessage, message); err != nil {
+				return
+			}
+
+		case <-ticker.C:
+			client.conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
+			if err := client.conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+				return
+			}
+		}
+	}
+}
+
+// handleWSBroadcast handles broadcasting messages to subscribed clients
+func (s *Server) handleWSBroadcast() {
+	for msg := range s.wsBroadcast {
+		s.wsClientsMu.RLock()
+		for _, client := range s.wsClients {
+			client.mu.RLock()
+			subscribed := client.subscriptions[msg.Topic]
+			client.mu.RUnlock()
+
+			if subscribed {
+				client.writeMessage(msg)
+			}
+		}
+		s.wsClientsMu.RUnlock()
+	}
+}
+
+// handleWSSubscription handles subscription requests
+func (s *Server) handleWSSubscription(client *WSClient, req *WSSubscribeRequest) {
+	client.mu.Lock()
+	defer client.mu.Unlock()
+
+	validTopics := map[string]bool{
+		"metrics":   true,
+		"logs":      true,
+		"alerts":    true,
+		"proposals": true,
+	}
+
+	for _, topic := range req.Topics {
+		if !validTopics[topic] {
+			s.logger.Warn("Invalid subscription topic", "topic", topic)
+			continue
+		}
+
+		if req.Action == "subscribe" {
+			client.subscriptions[topic] = true
+			s.logger.Info("Client subscribed", "topic", topic, "remote_addr", client.conn.RemoteAddr().String())
+
+			// Send confirmation
+			msg := WSMessage{
+				Type:  "subscribed",
+				Topic: topic,
+				Data:  map[string]string{"status": "subscribed"},
+				Time:  time.Now().Unix(),
+			}
+			client.writeMessage(msg)
+
+		} else if req.Action == "unsubscribe" {
+			delete(client.subscriptions, topic)
+			s.logger.Info("Client unsubscribed", "topic", topic, "remote_addr", client.conn.RemoteAddr().String())
+
+			// Send confirmation
+			msg := WSMessage{
+				Type:  "unsubscribed",
+				Topic: topic,
+				Data:  map[string]string{"status": "unsubscribed"},
+				Time:  time.Now().Unix(),
+			}
+			client.writeMessage(msg)
+		}
+	}
+}
+
+// removeWSClient removes a client from the server
+func (s *Server) removeWSClient(client *WSClient) {
+	s.wsClientsMu.Lock()
+	defer s.wsClientsMu.Unlock()
+
+	if _, ok := s.wsClients[client.conn]; ok {
+		delete(s.wsClients, client.conn)
+		close(client.send)
+		s.logger.Info("WebSocket client disconnected", "remote_addr", client.conn.RemoteAddr().String())
+	}
+}
+
+// writeMessage writes a message to the client
+func (client *WSClient) writeMessage(msg WSMessage) {
+	data, err := json.Marshal(msg)
+	if err != nil {
+		return
+	}
+
+	select {
+	case client.send <- data:
+	default:
+		// Channel full, skip message
+	}
+}
+
+// BroadcastMetrics broadcasts metrics update to all subscribed clients
+func (s *Server) BroadcastMetrics(snapshot *metrics.MetricsSnapshot) {
+	if snapshot == nil {
+		return
+	}
+
+	msg := WSMessage{
+		Type:  "update",
+		Topic: "metrics",
+		Data:  snapshot,
+		Time:  time.Now().Unix(),
+	}
+
+	select {
+	case s.wsBroadcast <- msg:
+	default:
+		// Broadcast channel full, skip
+	}
+}
+
+// BroadcastAlert broadcasts alert to all subscribed clients
+func (s *Server) BroadcastAlert(alert *metrics.Alert) {
+	if alert == nil {
+		return
+	}
+
+	msg := WSMessage{
+		Type:  "alert",
+		Topic: "alerts",
+		Data:  alert,
+		Time:  time.Now().Unix(),
+	}
+
+	select {
+	case s.wsBroadcast <- msg:
+	default:
+		// Broadcast channel full, skip
+	}
+}
+
+// BroadcastLog broadcasts log entry to all subscribed clients
+func (s *Server) BroadcastLog(logEntry map[string]interface{}) {
+	msg := WSMessage{
+		Type:  "log",
+		Topic: "logs",
+		Data:  logEntry,
+		Time:  time.Now().Unix(),
+	}
+
+	select {
+	case s.wsBroadcast <- msg:
+	default:
+		// Broadcast channel full, skip
+	}
+}
+
+// BroadcastProposal broadcasts proposal update to all subscribed clients
+func (s *Server) BroadcastProposal(proposal interface{}) {
+	msg := WSMessage{
+		Type:  "proposal",
+		Topic: "proposals",
+		Data:  proposal,
+		Time:  time.Now().Unix(),
+	}
+
+	select {
+	case s.wsBroadcast <- msg:
+	default:
+		// Broadcast channel full, skip
+	}
 }
 
 // ginLogger creates a Gin logging middleware

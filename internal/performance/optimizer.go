@@ -2,6 +2,7 @@ package performance
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"runtime"
 	"runtime/debug"
@@ -23,6 +24,7 @@ type Optimizer struct {
 	cancel            context.CancelFunc
 	gcTuner           *GCTuner
 	profileCollector  *ProfileCollector
+	profiler          *Profiler
 }
 
 // OptimizerConfig represents optimizer configuration
@@ -37,6 +39,7 @@ type OptimizerConfig struct {
 	GCPercent           int           `json:"gc_percent"`
 	EnableProfiling     bool          `json:"enable_profiling"`
 	ProfileInterval     time.Duration `json:"profile_interval"`
+	ProfileDir          string        `json:"profile_dir"`
 }
 
 // NewOptimizer creates a new performance optimizer
@@ -90,7 +93,19 @@ func (o *Optimizer) Start() error {
 
 	// Initialize profiling
 	if o.config.EnableProfiling {
+		// Set default profile directory if not specified
+		profileDir := o.config.ProfileDir
+		if profileDir == "" {
+			profileDir = "./profiles"
+		}
+
+		o.profiler = NewProfiler(profileDir, o.logger)
+		if err := o.profiler.Start(); err != nil {
+			return fmt.Errorf("failed to start profiler: %w", err)
+		}
+
 		o.profileCollector = NewProfileCollector(o.config.ProfileInterval, o.logger)
+		o.profileCollector.profiler = o.profiler // Link profiler to collector
 		o.profileCollector.Start()
 		o.logger.Info("Profiling enabled")
 	}
@@ -126,6 +141,12 @@ func (o *Optimizer) Stop() error {
 
 	if o.profileCollector != nil {
 		o.profileCollector.Stop()
+	}
+
+	if o.profiler != nil {
+		if err := o.profiler.Stop(); err != nil {
+			o.logger.Error("Failed to stop profiler", "error", err.Error())
+		}
 	}
 
 	o.logger.Info("Performance optimizer stopped")
@@ -207,6 +228,11 @@ func (o *Optimizer) GetConnectionPool() *ConnectionPool {
 // GetWorkerPool returns the worker pool
 func (o *Optimizer) GetWorkerPool() *WorkerPool {
 	return o.workerPool
+}
+
+// GetProfiler returns the profiler instance
+func (o *Optimizer) GetProfiler() *Profiler {
+	return o.profiler
 }
 
 // GetStats returns optimization statistics
@@ -311,6 +337,7 @@ type ProfileCollector struct {
 	interval time.Duration
 	logger   *logger.Logger
 	stop     chan struct{}
+	profiler *Profiler
 }
 
 // NewProfileCollector creates a new profile collector
@@ -349,12 +376,21 @@ func (p *ProfileCollector) collectLoop() {
 
 // collect performs profile collection
 func (p *ProfileCollector) collect() {
-	// Collect CPU profile
-	// In production, this would write to a file or send to a monitoring service
-	p.logger.Debug("Collecting performance profile")
+	if p.profiler == nil {
+		p.logger.Warn("Profiler not initialized")
+		return
+	}
 
-	// Example: runtime/pprof integration would go here
-	// pprof.StartCPUProfile(profileFile)
-	// time.Sleep(30 * time.Second)
-	// pprof.StopCPUProfile()
+	p.logger.Debug("Collecting performance profiles")
+
+	// Write all available profiles
+	if err := p.profiler.WriteAllProfiles(); err != nil {
+		p.logger.Error("Failed to collect profiles", "error", err.Error())
+		return
+	}
+
+	// Clean old profiles (keep only last 7 days)
+	if err := p.profiler.CleanOldProfiles(7 * 24 * time.Hour); err != nil {
+		p.logger.Warn("Failed to clean old profiles", "error", err.Error())
+	}
 }
