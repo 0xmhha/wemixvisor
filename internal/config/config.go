@@ -23,6 +23,7 @@ type Config struct {
 	// Process management
 	ShutdownGrace time.Duration `mapstructure:"daemon_shutdown_grace"`
 	PollInterval  time.Duration `mapstructure:"daemon_poll_interval"`
+	MaxRestarts   int           `mapstructure:"max_restarts"`
 
 	// Phase 4: Node lifecycle management
 	RestartOnFailure    bool              `mapstructure:"daemon_restart_on_failure"`
@@ -45,8 +46,17 @@ type Config struct {
 
 	// WBFT specific settings
 	RPCAddress      string `mapstructure:"daemon_rpc_address"`
+	RPCPort         int    `mapstructure:"daemon_rpc_port"`
 	ValidatorMode   bool   `mapstructure:"validator_mode"`
 	DisableRecase   bool   `mapstructure:"cosmovisor_disable_recase"`
+
+	// Network settings
+	NetworkID uint64 `mapstructure:"network_id"`
+	ChainID   string `mapstructure:"chain_id"`
+
+	// Health monitoring
+	HealthCheckInterval time.Duration `mapstructure:"health_check_interval"`
+	MetricsInterval     time.Duration `mapstructure:"metrics_interval"`
 
 	// Download settings
 	DownloadURLs       map[string]string `mapstructure:"download_urls"`
@@ -61,6 +71,8 @@ type Config struct {
 	Daemon      bool `mapstructure:"daemon"`       // Run in background
 	JSONOutput  bool `mapstructure:"json_output"`  // Output in JSON format
 	Quiet       bool `mapstructure:"quiet"`        // Suppress output
+	// Configuration version
+	ConfigVersion string `mapstructure:"config_version"`
 }
 
 // DefaultConfig returns a Config with default values

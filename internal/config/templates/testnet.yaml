@@ -1,0 +1,17 @@
+# WEMIX3.0 Testnet Configuration Template
+name: testnet
+description: WEMIX3.0 Testnet configuration
+network: testnet
+
+values:
+  network_id: 1112
+  chain_id: "1112"
+  rpc_port: 8545
+  ws_port: 8546
+  p2p_port: 30303
+  max_peers: 25
+  validator_mode: false
+  data_dir: ~/.wemix/testnet
+  bootnodes:
+    - enode://test123...@testnet-boot1.wemix.com:30303
+    - enode://test456...@testnet-boot2.wemix.com:30303
