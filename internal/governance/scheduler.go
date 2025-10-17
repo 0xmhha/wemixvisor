@@ -17,17 +17,17 @@ type UpgradeScheduler struct {
 	logger *logger.Logger
 
 	// State management
-	mu              sync.RWMutex
-	upgrades        map[string]*UpgradeInfo
-	scheduledQueue  []*UpgradeInfo
-	completedQueue  []*UpgradeInfo
-	currentUpgrade  *UpgradeInfo
+	mu             sync.RWMutex
+	upgrades       map[string]*UpgradeInfo
+	scheduledQueue []*UpgradeInfo
+	completedQueue []*UpgradeInfo
+	currentUpgrade *UpgradeInfo
 
 	// Configuration
-	enabled           bool
-	minUpgradeDelay   time.Duration
+	enabled               bool
+	minUpgradeDelay       time.Duration
 	maxConcurrentUpgrades int
-	validationEnabled bool
+	validationEnabled     bool
 }
 
 // NewUpgradeScheduler creates a new upgrade scheduler
@@ -322,10 +322,9 @@ func (us *UpgradeScheduler) validateUpgrade(upgrade *UpgradeInfo) error {
 		return fmt.Errorf("invalid upgrade height: %d", upgrade.Height)
 	}
 
-	// Check minimum delay
-	if time.Until(time.Now().Add(us.minUpgradeDelay)) < 0 {
-		return fmt.Errorf("upgrade scheduled too soon (minimum delay: %v)", us.minUpgradeDelay)
-	}
+	// Note: Minimum delay validation is handled at the height-based execution level.
+	// Time-based validation is not applicable for height-based upgrades since
+	// the actual execution time depends on block production rate.
 
 	// Validate binaries if provided
 	if upgrade.Binaries != nil {
