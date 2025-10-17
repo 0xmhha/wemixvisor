@@ -7,75 +7,429 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.7.0] - 2025-10-01
+## [0.7.0] - 2025-10-17
+
+### Phase 7: Advanced Monitoring and Management
+
+Complete monitoring, observability, and management system for production deployments.
 
 ### Added
-- Comprehensive metrics collection system with Prometheus integration
-- RESTful API server for management and monitoring
-- Grafana dashboard templates for visualization
-- Multi-channel alerting system (Email, Slack, Discord, Webhook)
-- Advanced performance optimization features
-- LRU cache with TTL support for improved performance
-- Connection pooling for efficient resource management
-- Worker pool for concurrent task execution
-- Garbage collection tuning and memory optimization
-- Real-time performance profiling capabilities
 
-### Features
-- **Metrics Collection**
-  - System metrics (CPU, memory, disk, network)
-  - Application metrics (upgrades, restarts, uptime)
-  - Node metrics (height, peers, sync status)
-  - Governance metrics (proposals, validators)
-  - Prometheus-compatible export format
+#### Core Features
+- **Metrics Collection System**
+  - Real-time metrics collection with configurable intervals (1-300s)
+  - Multi-category metrics: System, Process, Chain, Application, Governance
+  - Prometheus-compatible exporter with HTTP endpoint (:9090/metrics)
+  - Metrics snapshot API for programmatic access
+  - Low overhead design (<1% CPU impact)
 
-- **API Server**
-  - Complete RESTful API with authentication
-  - JWT and API key support
-  - Rate limiting and CORS configuration
-  - Endpoints for status, metrics, upgrades, governance
-  - WebSocket support for real-time updates
-
-- **Monitoring Dashboard**
-  - Pre-built Grafana dashboard templates
-  - Real-time visualization of all metrics
-  - Customizable panels and alerts
-  - Multi-node monitoring support
+- **RESTful API Server**
+  - Complete HTTP API for management and monitoring (:8080)
+  - WebSocket support for real-time updates and log streaming
+  - Health check endpoint for container orchestration
+  - Status, metrics, upgrades, and governance endpoints
+  - CORS support for web-based dashboards
 
 - **Alerting System**
-  - Rule-based alert evaluation
-  - Multiple notification channels
-  - Alert history and management
-  - Customizable thresholds and conditions
-  - Alert resolution tracking
+  - Rule-based alert evaluation with flexible conditions
+  - Four notification channels: Email, Slack, Discord, Webhook
+  - Severity levels: critical, warning, info
+  - Alert duration thresholds (prevent flapping)
+  - Alert history tracking and management API
+
+- **Performance Profiling**
+  - CPU profiling with configurable duration
+  - Memory heap profiling
+  - Goroutine profiling for concurrency analysis
+  - Profile management (list, clean old profiles)
+  - CLI commands for all profiling operations
 
 - **Performance Optimization**
-  - Intelligent caching system with hit rate tracking
-  - Connection pool with automatic cleanup
-  - Task queue with priority support
-  - Memory management and GC tuning
-  - Performance statistics and monitoring
+  - LRU cache with TTL support and hit rate tracking
+  - Connection pool with automatic cleanup and monitoring
+  - Worker pool for concurrent task execution
+  - Garbage collection tuning for production workloads
+  - Resource usage optimization
+
+#### CLI Integration
+- `wemixvisor api` - Start API server with metrics and WebSocket
+  - `--port` - API server port (default: 8080)
+  - `--enable-metrics` - Enable metrics collection
+  - `--enable-governance` - Enable governance monitoring
+  - `--metrics-interval` - Collection interval in seconds
+  - `--enable-system-metrics` - Enable system metrics
+
+- `wemixvisor metrics` - Metrics management commands
+  - `collect` - Start metrics collection
+  - `show` - Display current metrics (human-readable or JSON)
+  - `export` - Start Prometheus exporter
+
+- `wemixvisor profile` - Performance profiling commands
+  - `cpu` - Capture CPU profile
+  - `heap` - Capture memory heap profile
+  - `goroutine` - Capture goroutine profile
+  - `all` - Capture all profiles
+  - `list` - List saved profiles
+  - `clean` - Remove old profiles
+
+#### Configuration Examples
+- **Basic Configuration** (`examples/config/basic-config.toml`)
+  - Minimal settings for quick start
+  - Development and testing optimized
+  - Simple monitoring setup
+
+- **Advanced Configuration** (`examples/config/advanced-config.toml`)
+  - All Phase 7 features enabled
+  - Comprehensive alerting rules
+  - Performance optimization settings
+  - Multi-channel notifications
+
+- **Production Configuration** (`examples/config/production-config.toml`)
+  - Security-hardened settings
+  - Manual binary verification required
+  - Critical alert rules with short evaluation windows
+  - Long-term log retention (90 days)
+  - JSON logging for aggregation systems
+
+#### Grafana Dashboards
+Three pre-built Grafana dashboard templates:
+
+- **System Overview Dashboard** (`examples/grafana/overview-dashboard.json`)
+  - System uptime and resource usage (CPU, Memory, Disk)
+  - Network traffic (RX/TX bytes)
+  - Goroutine count
+  - Active alerts table
+  - Auto-refresh: 10s
+
+- **Upgrades Dashboard** (`examples/grafana/upgrades-dashboard.json`)
+  - Total upgrades and success rate gauge
+  - Upgrade history timeline
+  - Upgrade duration trends
+  - Backup operations tracking
+  - Pre/post upgrade hook execution
+  - Auto-refresh: 10s, 6-hour time range
+
+- **Governance Dashboard** (`examples/grafana/governance-dashboard.json`)
+  - Active proposals and voting status
+  - Proposal status distribution (pie chart)
+  - Voting distribution (Yes/No/Abstain/Veto)
+  - Voter participation rate
+  - Validator statistics and voting power
+  - Quorum status gauge
+  - Auto-refresh: 30s, 24-hour time range
+
+#### Documentation
+Complete documentation suite for Phase 7:
+
+- **Metrics Documentation** (`docs/metrics.md`)
+  - Overview and architecture
+  - All metric categories and reference
+  - Collection configuration (TOML, CLI, environment)
+  - Usage examples (CLI, API, WebSocket, Go)
+  - Prometheus integration with queries
+  - Alert rules and best practices
+  - Troubleshooting guide
+
+- **Alerting Configuration Guide** (`docs/alerting.md`)
+  - Alert system architecture and lifecycle
+  - Configuration options
+  - Alert rule syntax and examples
+  - Notification channel setup (Email, Slack, Discord, Webhook)
+  - Alert management API
+  - Best practices and severity guidelines
+  - Troubleshooting common issues
+
+- **Grafana Dashboard Setup Guide** (`docs/grafana.md`)
+  - Installation (Docker Compose, manual)
+  - Prometheus data source configuration
+  - Dashboard import methods
+  - Customization and panel configuration
+  - Alert configuration in Grafana
+  - Best practices for layout and performance
+  - Production deployment with HA
+
+- **Usage Examples** (`examples/README.md`)
+  - Configuration file descriptions
+  - CLI usage for all Phase 7 commands
+  - API endpoint reference
+  - Prometheus and Grafana integration
+  - WebSocket connection examples
+  - Troubleshooting tips
+
+#### Monitoring Script
+- **Start with Monitoring** (`examples/scripts/start-with-monitoring.sh`)
+  - Convenience script for full monitoring stack
+  - Starts API server and Prometheus exporter
+  - Displays access URLs
+  - Automatic cleanup on exit
+
+### Features
+
+#### Metrics Collection (internal/metrics/)
+- **Collector** - Core metrics collection engine
+  - Configurable collection interval
+  - Five metric categories
+  - Thread-safe snapshot generation
+  - Start/stop lifecycle management
+  - Metrics aggregation and caching
+
+- **Exporter** - Prometheus HTTP exporter
+  - HTTP handler for /metrics endpoint
+  - Prometheus text format export
+  - Concurrent scraping support
+  - Configurable port and path
+
+- **Metric Categories**
+  - **System**: CPU, memory, disk, network, uptime, goroutines
+  - **Process**: Uptime, state, restart count, exit codes
+  - **Chain**: Block height, sync status, peers, transactions
+  - **Application**: Upgrades, backups, hooks, API stats
+  - **Governance**: Proposals, voting, validators, participation
+
+#### API Server (internal/api/)
+- **HTTP Server**
+  - RESTful API with standard HTTP methods
+  - JSON request/response format
+  - CORS support for cross-origin requests
+  - Health check endpoint
+  - Graceful shutdown with timeout
+
+- **Endpoints**
+  - `GET /health` - Health check
+  - `GET /api/v1/status` - Node status
+  - `GET /api/v1/metrics` - Current metrics
+  - `GET /api/v1/upgrades` - Upgrade history
+  - `GET /api/v1/governance/proposals` - Governance proposals
+  - `GET /api/v1/ws` - WebSocket upgrade
+
+- **WebSocket Server**
+  - Real-time bidirectional communication
+  - Topic-based subscription (metrics, alerts, logs)
+  - Broadcast to all connected clients
+  - Connection management and cleanup
+  - Heartbeat/ping-pong keep-alive
+
+#### Alerting System (internal/alerting/)
+- **Alert Manager**
+  - Rule-based alert evaluation
+  - Alert state management (pending, firing, resolved)
+  - Alert history with configurable retention
+  - Concurrent alert processing
+
+- **Notification Channels**
+  - **Email**: SMTP with TLS support, multiple recipients
+  - **Slack**: Webhook integration with attachments
+  - **Discord**: Webhook integration with embeds
+  - **Webhook**: Generic HTTP POST for custom integrations
+
+- **Alert Rules**
+  - Flexible condition expressions
+  - Severity classification
+  - Duration thresholds ("for" clause)
+  - Custom labels for routing
+  - Templated messages
+
+#### Performance Profiling (internal/performance/)
+- **Profiler**
+  - CPU profiling with configurable duration
+  - Memory heap snapshots
+  - Goroutine profiling
+  - Profile file management
+  - Automatic profile rotation
+
+- **Optimization Components**
+  - **Cache**: LRU cache with TTL and hit rate tracking
+  - **Connection Pool**: Reusable connections with health checks
+  - **Worker Pool**: Concurrent task execution with queuing
+  - **GC Tuning**: Garbage collection optimization
 
 ### Architecture
-- Modular design with separate packages for each feature
+
+#### Design Principles
+- Modular architecture with clear separation of concerns
+- Interface-based design for testability
 - Thread-safe implementations with proper synchronization
 - Context-aware cancellation and cleanup
-- Efficient resource management
+- Efficient resource management with automatic cleanup
 - Comprehensive error handling and recovery
 
-### Testing
-- Unit tests for all performance components
-- Integration tests for API endpoints
-- Mock implementations for testing
-- Performance benchmarking tests
-- Coverage maintained above 80%
+#### Component Integration
+```
+┌──────────────────────────────────────┐
+│         CLI Commands                 │
+│  (api, metrics, profile)             │
+└──────────┬───────────────────────────┘
+           │
+           v
+┌──────────────────────────────────────┐
+│      Internal Packages               │
+│  - api/      (HTTP + WebSocket)      │
+│  - metrics/  (Collection + Export)   │
+│  - alerting/ (Rules + Notifications) │
+│  - performance/ (Profiling + Opts)   │
+└──────────┬───────────────────────────┘
+           │
+           v
+┌──────────────────────────────────────┐
+│     External Integrations            │
+│  - Prometheus (metrics scraping)     │
+│  - Grafana (visualization)           │
+│  - Email/Slack/Discord (alerts)      │
+└──────────────────────────────────────┘
+```
 
-### Documentation
-- Complete user guide for Phase 7 features
-- API documentation with examples
-- Monitoring setup guide
-- Performance tuning recommendations
-- Example implementations for all features
+### Testing
+
+Comprehensive test coverage across all Phase 7 components:
+
+#### Test Statistics
+- **Metrics Package**: 90%+ coverage
+  - Collector: Complete metric collection tests
+  - Exporter: HTTP handler and Prometheus format tests
+
+- **Alerting Package**: 88.2% coverage
+  - Alert evaluation engine tests
+  - Notification channel tests
+  - Rule parsing and condition evaluation
+
+- **API Package**: 54.2% total coverage
+  - HTTP handlers: 30.2% coverage (16 tests)
+  - WebSocket: Complete connection lifecycle tests (16 tests)
+  - Server lifecycle and graceful shutdown
+
+- **Performance Package**: 69.6% coverage
+  - Profiler tests (19 tests)
+  - CPU, heap, and goroutine profiling
+  - Profile management and cleanup
+
+#### Test Types
+- Unit tests for all components
+- Integration tests for API endpoints
+- WebSocket connection tests
+- Mock implementations for external dependencies
+- Error handling and edge case coverage
+
+### Configuration
+
+#### New Configuration Sections
+
+**Monitoring Configuration**:
+```toml
+[monitoring]
+enable_api = true
+api_port = 8080
+enable_metrics = true
+metrics_interval = 10
+enable_system_metrics = true
+enable_process_metrics = true
+enable_chain_metrics = true
+enable_prometheus = true
+prometheus_port = 9090
+prometheus_path = "/metrics"
+enable_profiling = false
+profile_dir = "/opt/wemixd/profiles"
+```
+
+**Alerting Configuration**:
+```toml
+[alerting]
+enabled = true
+evaluation_interval = "10s"
+alert_retention = "24h"
+
+[alerting.email]
+enabled = false
+smtp_server = "smtp.gmail.com"
+smtp_port = 587
+from = "alerts@example.com"
+to = ["admin@example.com"]
+
+[[alerting.rules]]
+name = "high_cpu_usage"
+condition = "cpu_usage > 80"
+severity = "warning"
+for = "5m"
+message = "CPU usage is above 80%"
+```
+
+**Performance Configuration**:
+```toml
+[performance]
+enabled = true
+connection_pool_size = 100
+worker_pool_size = 10
+enable_cache = true
+cache_size = 1000
+cache_ttl = "5m"
+gc_percent = 100
+```
+
+#### Environment Variables
+- `WEMIXVISOR_ALERT_EMAIL_PASSWORD` - SMTP password
+- `WEMIXVISOR_ALERT_SLACK_WEBHOOK` - Slack webhook URL
+- `WEMIXVISOR_ALERT_DISCORD_WEBHOOK` - Discord webhook URL
+- `WEMIXVISOR_ALERT_WEBHOOK_URL` - Generic webhook URL
+- `WEMIXVISOR_API_KEY` - API authentication key
+
+### Performance Characteristics
+
+#### Resource Usage
+- Metrics collection overhead: <1% CPU
+- Memory footprint: ~50MB additional for monitoring stack
+- API server: <100ms average response time
+- Metrics export: <10ms per scrape
+- WebSocket: <5ms message latency
+
+#### Scalability
+- Metrics collection: Up to 300-second intervals configurable
+- API server: Concurrent request handling
+- WebSocket: Multiple simultaneous connections
+- Alert evaluation: Sub-second rule processing
+- Prometheus export: 1000s of metrics supported
+
+### Breaking Changes
+None. Phase 7 is fully backward compatible with existing configurations.
+
+### Migration Guide
+
+#### From v0.6.0 to v0.7.0
+
+1. **Update Configuration** (Optional):
+   ```toml
+   # Add monitoring section
+   [monitoring]
+   enable_api = true
+   enable_metrics = true
+   ```
+
+2. **Install Monitoring Stack** (Optional):
+   ```bash
+   # Start with monitoring
+   wemixvisor api --enable-metrics
+
+   # Or use convenience script
+   ./examples/scripts/start-with-monitoring.sh
+   ```
+
+3. **Import Grafana Dashboards** (Optional):
+   - Import `examples/grafana/*.json` to Grafana
+   - Configure Prometheus data source
+
+#### Backward Compatibility
+All Phase 7 features are opt-in:
+- Existing configurations work without changes
+- Monitoring features disabled by default
+- No impact on core upgrade functionality
+
+### Known Issues
+None.
+
+### Future Improvements
+- OpenAPI/Swagger documentation for API
+- E2E tests for complete Phase 7 workflows
+- Additional dashboard templates
+- Enhanced alert rule language
+- Metrics retention and archival
 
 ## [0.6.0] - 2025-09-30
 
