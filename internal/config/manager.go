@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"sync"
 	"time"
 
@@ -32,7 +33,7 @@ type Manager struct {
 	migrator  *Migrator
 
 	// File watching
-	watcher  *fsnotify.Watcher
+	watcher    *fsnotify.Watcher
 	configPath string
 
 	// Synchronization
@@ -71,9 +72,9 @@ type WemixvisorConfig struct {
 	Name string `toml:"name" yaml:"name" json:"name"`
 
 	// Process management
-	MaxRestarts       int           `toml:"max_restarts" yaml:"max_restarts" json:"max_restarts"`
-	RestartDelay      time.Duration `toml:"restart_delay" yaml:"restart_delay" json:"restart_delay"`
-	ShutdownGrace     time.Duration `toml:"shutdown_grace" yaml:"shutdown_grace" json:"shutdown_grace"`
+	MaxRestarts   int           `toml:"max_restarts" yaml:"max_restarts" json:"max_restarts"`
+	RestartDelay  time.Duration `toml:"restart_delay" yaml:"restart_delay" json:"restart_delay"`
+	ShutdownGrace time.Duration `toml:"shutdown_grace" yaml:"shutdown_grace" json:"shutdown_grace"`
 
 	// Monitoring
 	HealthCheckInterval time.Duration `toml:"health_check_interval" yaml:"health_check_interval" json:"health_check_interval"`
@@ -81,46 +82,46 @@ type WemixvisorConfig struct {
 	MetricsEnabled      bool          `toml:"metrics_enabled" yaml:"metrics_enabled" json:"metrics_enabled"`
 
 	// Upgrade settings
-	AllowDownloadBinaries bool `toml:"allow_download_binaries" yaml:"allow_download_binaries" json:"allow_download_binaries"`
-	AutoBackup           bool `toml:"auto_backup" yaml:"auto_backup" json:"auto_backup"`
-	PreUpgradeTimeout    time.Duration `toml:"pre_upgrade_timeout" yaml:"pre_upgrade_timeout" json:"pre_upgrade_timeout"`
+	AllowDownloadBinaries bool          `toml:"allow_download_binaries" yaml:"allow_download_binaries" json:"allow_download_binaries"`
+	AutoBackup            bool          `toml:"auto_backup" yaml:"auto_backup" json:"auto_backup"`
+	PreUpgradeTimeout     time.Duration `toml:"pre_upgrade_timeout" yaml:"pre_upgrade_timeout" json:"pre_upgrade_timeout"`
 
 	// Logging
-	LogLevel       string `toml:"log_level" yaml:"log_level" json:"log_level"`
-	LogFormat      string `toml:"log_format" yaml:"log_format" json:"log_format"`
-	LogTimeFormat  string `toml:"log_time_format" yaml:"log_time_format" json:"log_time_format"`
+	LogLevel      string `toml:"log_level" yaml:"log_level" json:"log_level"`
+	LogFormat     string `toml:"log_format" yaml:"log_format" json:"log_format"`
+	LogTimeFormat string `toml:"log_time_format" yaml:"log_time_format" json:"log_time_format"`
 }
 
 // NodeConfig represents node-specific configuration
 type NodeConfig struct {
 	// Network settings
-	NetworkID    uint64 `toml:"network_id" yaml:"network_id" json:"network_id"`
-	ChainID      string `toml:"chain_id" yaml:"chain_id" json:"chain_id"`
+	NetworkID uint64 `toml:"network_id" yaml:"network_id" json:"network_id"`
+	ChainID   string `toml:"chain_id" yaml:"chain_id" json:"chain_id"`
 
 	// RPC settings
-	RPCAddr      string   `toml:"rpc_addr" yaml:"rpc_addr" json:"rpc_addr"`
-	RPCPort      int      `toml:"rpc_port" yaml:"rpc_port" json:"rpc_port"`
-	RPCAPIs      []string `toml:"rpc_apis" yaml:"rpc_apis" json:"rpc_apis"`
+	RPCAddr string   `toml:"rpc_addr" yaml:"rpc_addr" json:"rpc_addr"`
+	RPCPort int      `toml:"rpc_port" yaml:"rpc_port" json:"rpc_port"`
+	RPCAPIs []string `toml:"rpc_apis" yaml:"rpc_apis" json:"rpc_apis"`
 
 	// WebSocket settings
-	WSAddr       string   `toml:"ws_addr" yaml:"ws_addr" json:"ws_addr"`
-	WSPort       int      `toml:"ws_port" yaml:"ws_port" json:"ws_port"`
-	WSAPIs       []string `toml:"ws_apis" yaml:"ws_apis" json:"ws_apis"`
+	WSAddr string   `toml:"ws_addr" yaml:"ws_addr" json:"ws_addr"`
+	WSPort int      `toml:"ws_port" yaml:"ws_port" json:"ws_port"`
+	WSAPIs []string `toml:"ws_apis" yaml:"ws_apis" json:"ws_apis"`
 
 	// P2P settings
-	P2PPort      int      `toml:"p2p_port" yaml:"p2p_port" json:"p2p_port"`
-	Bootnodes    []string `toml:"bootnodes" yaml:"bootnodes" json:"bootnodes"`
-	MaxPeers     int      `toml:"max_peers" yaml:"max_peers" json:"max_peers"`
+	P2PPort   int      `toml:"p2p_port" yaml:"p2p_port" json:"p2p_port"`
+	Bootnodes []string `toml:"bootnodes" yaml:"bootnodes" json:"bootnodes"`
+	MaxPeers  int      `toml:"max_peers" yaml:"max_peers" json:"max_peers"`
 
 	// Consensus settings (WBFT)
 	ValidatorMode bool   `toml:"validator_mode" yaml:"validator_mode" json:"validator_mode"`
 	ValidatorKey  string `toml:"validator_key" yaml:"validator_key" json:"validator_key"`
 
 	// Data directory
-	DataDir      string `toml:"data_dir" yaml:"data_dir" json:"data_dir"`
+	DataDir string `toml:"data_dir" yaml:"data_dir" json:"data_dir"`
 
 	// Additional geth flags
-	ExtraFlags   []string `toml:"extra_flags" yaml:"extra_flags" json:"extra_flags"`
+	ExtraFlags []string `toml:"extra_flags" yaml:"extra_flags" json:"extra_flags"`
 }
 
 // NewManager creates a new configuration manager
@@ -440,7 +441,7 @@ func (m *Manager) watchLoop() {
 
 			// Handle the event
 			if event.Op&fsnotify.Write == fsnotify.Write ||
-			   event.Op&fsnotify.Create == fsnotify.Create {
+				event.Op&fsnotify.Create == fsnotify.Create {
 				m.handleConfigChange()
 			}
 
@@ -516,20 +517,20 @@ func (m *Manager) splitConfig() {
 // applyDefaults applies default configuration values
 func (m *Manager) applyDefaults() {
 	m.wemixvisorConfig = &WemixvisorConfig{
-		Home:                filepath.Join(os.Getenv("HOME"), ".wemixvisor"),
-		Name:                "wemixd",
-		MaxRestarts:         5,
-		RestartDelay:        1 * time.Second,
-		ShutdownGrace:       30 * time.Second,
-		HealthCheckInterval: 30 * time.Second,
-		MetricsInterval:     60 * time.Second,
-		MetricsEnabled:      true,
+		Home:                  filepath.Join(os.Getenv("HOME"), ".wemixvisor"),
+		Name:                  "wemixd",
+		MaxRestarts:           5,
+		RestartDelay:          1 * time.Second,
+		ShutdownGrace:         30 * time.Second,
+		HealthCheckInterval:   30 * time.Second,
+		MetricsInterval:       60 * time.Second,
+		MetricsEnabled:        true,
 		AllowDownloadBinaries: true,
-		AutoBackup:          true,
-		PreUpgradeTimeout:   5 * time.Minute,
-		LogLevel:            "info",
-		LogFormat:           "json",
-		LogTimeFormat:       "rfc3339",
+		AutoBackup:            true,
+		PreUpgradeTimeout:     5 * time.Minute,
+		LogLevel:              "info",
+		LogFormat:             "json",
+		LogTimeFormat:         "rfc3339",
 	}
 
 	m.nodeConfig = &NodeConfig{
@@ -549,11 +550,45 @@ func (m *Manager) applyDefaults() {
 	m.mergeConfigs()
 }
 
-// updateField updates a specific configuration field
+// updateField updates a specific configuration field using reflection
 func (m *Manager) updateField(key string, value interface{}) error {
-	// This would use reflection to update the field
-	// For now, return not implemented
-	return fmt.Errorf("not implemented")
+	if m.mergedConfig == nil {
+		return fmt.Errorf("merged config is nil")
+	}
+
+	// Get reflect.Value of mergedConfig
+	configValue := reflect.ValueOf(m.mergedConfig).Elem()
+
+	// Find the field by name
+	field := configValue.FieldByName(key)
+	if !field.IsValid() {
+		return fmt.Errorf("field %s not found in configuration", key)
+	}
+
+	if !field.CanSet() {
+		return fmt.Errorf("field %s cannot be set (may be unexported)", key)
+	}
+
+	// Convert value to the correct type and set
+	valueReflect := reflect.ValueOf(value)
+
+	// Handle type conversion
+	if !valueReflect.Type().AssignableTo(field.Type()) {
+		// Try to convert the value to the field type
+		if valueReflect.Type().ConvertibleTo(field.Type()) {
+			valueReflect = valueReflect.Convert(field.Type())
+		} else {
+			return fmt.Errorf("value type %v not assignable to field type %v", valueReflect.Type(), field.Type())
+		}
+	}
+
+	// Set the field value
+	field.Set(valueReflect)
+
+	// Update individual configs to keep them in sync
+	m.splitConfig()
+
+	return nil
 }
 
 // applyTemplateConfig applies a template to the current config

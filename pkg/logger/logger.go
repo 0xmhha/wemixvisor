@@ -14,31 +14,25 @@ type Logger struct {
 }
 
 // New creates a new logger instance
-func New(colorLogs bool, disableLogs bool, timeFormat string) (*Logger, error) {
-	if disableLogs {
-		return &Logger{zap.NewNop()}, nil
-	}
-
+func New(debug bool, colorLogs bool, logFile string) (*Logger, error) {
 	var config zap.Config
-	if colorLogs {
+	if debug {
 		config = zap.NewDevelopmentConfig()
-		config.EncoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
+		if colorLogs {
+			config.EncoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
+		}
 	} else {
 		config = zap.NewProductionConfig()
 	}
 
-	switch timeFormat {
-	case "kitchen":
-		config.EncoderConfig.EncodeTime = zapcore.TimeEncoderOfLayout("3:04PM")
-	case "rfc3339":
-		config.EncoderConfig.EncodeTime = zapcore.RFC3339TimeEncoder
-	case "rfc3339nano":
-		config.EncoderConfig.EncodeTime = zapcore.RFC3339NanoTimeEncoder
-	default:
-		config.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
-	}
+	// Set time format
+	config.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
 
+	// Configure output paths
 	config.OutputPaths = []string{"stdout"}
+	if logFile != "" {
+		config.OutputPaths = append(config.OutputPaths, logFile)
+	}
 	config.ErrorOutputPaths = []string{"stderr"}
 
 	zapLogger, err := config.Build()
