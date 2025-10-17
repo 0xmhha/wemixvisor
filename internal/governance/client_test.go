@@ -76,7 +76,7 @@ func TestWBFTClient_GetCurrentHeight(t *testing.T) {
 	testLogger := logger.NewTestLogger()
 
 	t.Run("successful response", func(t *testing.T) {
-		server := newTestServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		server := newTestServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
 			response := `{
@@ -101,7 +101,7 @@ func TestWBFTClient_GetCurrentHeight(t *testing.T) {
 	})
 
 	t.Run("error response", func(t *testing.T) {
-		server := newTestServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		server := newTestServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
 			response := `{
@@ -124,7 +124,7 @@ func TestWBFTClient_GetCurrentHeight(t *testing.T) {
 	})
 
 	t.Run("invalid JSON", func(t *testing.T) {
-		server := newTestServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		server := newTestServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
 			w.Write([]byte(`invalid json`))
@@ -143,7 +143,7 @@ func TestWBFTClient_GetBlock(t *testing.T) {
 	testLogger := logger.NewTestLogger()
 
 	t.Run("error response", func(t *testing.T) {
-		server := newTestServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		server := newTestServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
 			response := `{
@@ -171,7 +171,7 @@ func TestWBFTClient_GetGovernanceProposals(t *testing.T) {
 	testLogger := logger.NewTestLogger()
 
 	t.Run("error response", func(t *testing.T) {
-		server := newTestServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		server := newTestServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
 			response := `{
@@ -199,7 +199,7 @@ func TestWBFTClient_GetProposal(t *testing.T) {
 	testLogger := logger.NewTestLogger()
 
 	t.Run("proposal not found", func(t *testing.T) {
-		server := newTestServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		server := newTestServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
 			response := `{
@@ -227,7 +227,7 @@ func TestWBFTClient_GetValidators(t *testing.T) {
 	testLogger := logger.NewTestLogger()
 
 	t.Run("error response", func(t *testing.T) {
-		server := newTestServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		server := newTestServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
 			response := `{
@@ -255,7 +255,7 @@ func TestWBFTClient_GetGovernanceParams(t *testing.T) {
 	testLogger := logger.NewTestLogger()
 
 	t.Run("error response", func(t *testing.T) {
-		server := newTestServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		server := newTestServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
 			response := `{
@@ -282,7 +282,7 @@ func TestWBFTClient_GetGovernanceParams(t *testing.T) {
 func TestWBFTClient_GetBlock_Success(t *testing.T) {
 	testLogger := logger.NewTestLogger()
 
-	server := newTestServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := newTestServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		response := `{
@@ -319,7 +319,7 @@ func TestWBFTClient_GetBlock_Success(t *testing.T) {
 func TestWBFTClient_GetGovernanceProposals_Success(t *testing.T) {
 	testLogger := logger.NewTestLogger()
 
-	server := newTestServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := newTestServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		response := `{
@@ -366,7 +366,7 @@ func TestWBFTClient_GetGovernanceProposals_Success(t *testing.T) {
 func TestWBFTClient_GetProposal_Success(t *testing.T) {
 	testLogger := logger.NewTestLogger()
 
-	server := newTestServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := newTestServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		response := `{
@@ -410,7 +410,7 @@ func TestWBFTClient_GetProposal_Success(t *testing.T) {
 func TestWBFTClient_GetValidators_Success(t *testing.T) {
 	testLogger := logger.NewTestLogger()
 
-	server := newTestServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := newTestServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		response := `{
@@ -445,7 +445,7 @@ func TestWBFTClient_GetValidators_Success(t *testing.T) {
 func TestWBFTClient_GetGovernanceParams_Success(t *testing.T) {
 	testLogger := logger.NewTestLogger()
 
-	server := newTestServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := newTestServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		response := `{
@@ -531,7 +531,7 @@ func TestWBFTClient_MakeRequest_Error(t *testing.T) {
 	testLogger := logger.NewTestLogger()
 
 	t.Run("JSON RPC Error Response", func(t *testing.T) {
-		server := newTestServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		server := newTestServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
 			response := `{
@@ -555,7 +555,7 @@ func TestWBFTClient_MakeRequest_Error(t *testing.T) {
 	})
 
 	t.Run("HTTP Error Status", func(t *testing.T) {
-		server := newTestServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		server := newTestServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusInternalServerError)
 		}))
 		defer server.Close()
@@ -571,7 +571,7 @@ func TestWBFTClient_MakeRequest_Error(t *testing.T) {
 func TestWBFTClient_ParseProposalContent(t *testing.T) {
 	testLogger := logger.NewTestLogger()
 
-	server := newTestServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := newTestServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		response := `{
