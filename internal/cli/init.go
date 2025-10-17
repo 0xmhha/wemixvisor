@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"go.uber.org/zap"
 	"github.com/spf13/cobra"
 	"github.com/wemix/wemixvisor/internal/config"
 	"github.com/wemix/wemixvisor/pkg/logger"
