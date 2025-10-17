@@ -2,6 +2,8 @@ package metrics
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"runtime"
 	"sync"
 	"time"
@@ -167,36 +169,31 @@ func (c *MetricsCollector) ExportMetrics(format string) ([]byte, error) {
 
 // exportJSON exports metrics as JSON
 func (c *MetricsCollector) exportJSON(metrics Metrics) ([]byte, error) {
-	// This would use json.Marshal in practice
-	// For now, return a simple string representation
-	result := `{
-  "timestamp": "` + metrics.Timestamp.Format(time.RFC3339) + `",
-  "node_uptime_seconds": ` + string(rune(metrics.NodeUptime)) + `,
-  "restart_count": ` + string(rune(metrics.RestartCount)) + `,
-  "memory_usage_mb": ` + string(rune(int(metrics.MemoryUsageMB))) + `,
-  "healthy": ` + string(rune(boolToInt(metrics.Healthy))) + `
-}`
-	return []byte(result), nil
+	return json.MarshalIndent(metrics, "", "  ")
 }
 
 // exportPrometheus exports metrics in Prometheus format
 func (c *MetricsCollector) exportPrometheus(metrics Metrics) ([]byte, error) {
-	result := `# HELP wemixvisor_uptime_seconds Node uptime in seconds
+	result := fmt.Sprintf(`# HELP wemixvisor_uptime_seconds Node uptime in seconds
 # TYPE wemixvisor_uptime_seconds gauge
-wemixvisor_uptime_seconds ` + string(rune(metrics.NodeUptime)) + `
+wemixvisor_uptime_seconds %d
 
 # HELP wemixvisor_restart_count Total number of node restarts
 # TYPE wemixvisor_restart_count counter
-wemixvisor_restart_count ` + string(rune(metrics.RestartCount)) + `
+wemixvisor_restart_count %d
 
 # HELP wemixvisor_memory_usage_mb Memory usage in megabytes
 # TYPE wemixvisor_memory_usage_mb gauge
-wemixvisor_memory_usage_mb ` + string(rune(int(metrics.MemoryUsageMB))) + `
+wemixvisor_memory_usage_mb %.2f
 
 # HELP wemixvisor_healthy Node health status (1=healthy, 0=unhealthy)
 # TYPE wemixvisor_healthy gauge
-wemixvisor_healthy ` + string(rune(boolToInt(metrics.Healthy))) + `
-`
+wemixvisor_healthy %d
+`,
+		metrics.NodeUptime,
+		metrics.RestartCount,
+		metrics.MemoryUsageMB,
+		boolToInt(metrics.Healthy))
 	return []byte(result), nil
 }
 
