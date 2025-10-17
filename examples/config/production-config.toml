@@ -1,0 +1,159 @@
+# Wemixvisor Production Configuration Example
+# Optimized for production environments with security and reliability focus
+
+[daemon]
+home = "/var/lib/wemixd"
+name = "wemixd"
+allow_download_binaries = false  # Manual verification required in production
+restart_after_upgrade = true
+unsafe_skip_backup = false  # Always backup in production
+
+# Hooks for production deployments
+pre_upgrade = "/var/lib/wemixd/scripts/pre-upgrade-checks.sh"
+post_upgrade = "/var/lib/wemixd/scripts/post-upgrade-validation.sh"
+
+[node]
+rpc_address = "http://localhost:26657"
+api_address = "http://localhost:1317"
+grpc_address = "localhost:9090"
+
+[monitoring]
+# API Server (bind to localhost only for security)
+enable_api = true
+api_port = 8080
+
+# Comprehensive metrics for production monitoring
+enable_metrics = true
+metrics_interval = 10
+enable_system_metrics = true
+enable_process_metrics = true
+enable_chain_metrics = true
+
+# Prometheus for monitoring stack integration
+enable_prometheus = true
+prometheus_port = 9090
+prometheus_path = "/metrics"
+
+[governance]
+enable_governance = true
+poll_interval = 15  # More frequent polling for production
+enable_notifications = true
+
+# Do NOT enable auto-voting in production
+auto_vote = false
+
+[alerting]
+enabled = true
+evaluation_interval = "10s"
+alert_retention = "7d"  # Longer retention for production
+
+# Email for critical alerts
+[alerting.email]
+enabled = true
+smtp_server = "smtp.company.com"
+smtp_port = 587
+from = "wemixvisor-alerts@company.com"
+to = ["oncall@company.com", "devops@company.com"]
+username = "wemixvisor-alerts@company.com"
+# Password via environment: WEMIXVISOR_ALERT_EMAIL_PASSWORD
+
+# Slack for team notifications
+[alerting.slack]
+enabled = true
+# Webhook via environment: WEMIXVISOR_ALERT_SLACK_WEBHOOK
+
+# PagerDuty integration via webhook
+[alerting.webhook]
+enabled = true
+# URL via environment: WEMIXVISOR_ALERT_WEBHOOK_URL
+timeout = 10
+
+# Production Alert Rules
+[[alerting.rules]]
+name = "critical_cpu_usage"
+condition = "cpu_usage > 90"
+severity = "critical"
+for = "2m"
+message = "CRITICAL: CPU usage above 90% for 2 minutes"
+
+[[alerting.rules]]
+name = "critical_memory_usage"
+condition = "memory_usage > 95"
+severity = "critical"
+for = "1m"
+message = "CRITICAL: Memory usage above 95%"
+
+[[alerting.rules]]
+name = "critical_disk_space"
+condition = "disk_usage > 95"
+severity = "critical"
+for = "30s"
+message = "CRITICAL: Disk space critically low"
+
+[[alerting.rules]]
+name = "node_not_syncing"
+condition = "syncing == false && block_height < expected_height - 10"
+severity = "critical"
+for = "5m"
+message = "Node stopped syncing or significantly behind"
+
+[[alerting.rules]]
+name = "upgrade_available"
+condition = "upgrade_pending > 0"
+severity = "info"
+for = "0s"
+message = "Upgrade available - manual review required"
+
+[[alerting.rules]]
+name = "process_restarts"
+condition = "process_restarts > 3"
+severity = "warning"
+for = "1h"
+message = "Multiple process restarts detected"
+
+[backup]
+enabled = true
+dir = "/var/backups/wemixd"
+max_backups = 10  # More backups for production
+compress = true
+
+# Backup verification
+verify = true
+
+[performance]
+enabled = true
+connection_pool_size = 200
+worker_pool_size = 20
+enable_cache = true
+cache_size = 5000
+cache_ttl = "10m"
+gc_percent = 75  # Lower GC for production stability
+
+[logging]
+level = "info"  # Use "warn" for less verbose production logs
+color = false  # Disable colors for log aggregation
+file = "/var/log/wemixd/wemixvisor.log"
+max_size = 500  # Larger log files for production
+max_backups = 30
+max_age = 90
+
+# JSON format for log aggregation (ELK, Splunk, etc.)
+json = true
+
+caller = true
+stacktrace = true
+
+[security]
+# TLS for API endpoints (if exposed)
+enable_tls = false
+tls_cert = "/etc/wemixd/tls/server.crt"
+tls_key = "/etc/wemixd/tls/server.key"
+
+# API authentication
+enable_auth = false
+api_key = ""  # Via environment: WEMIXVISOR_API_KEY
+
+# Rate limiting
+enable_rate_limit = true
+rate_limit_requests = 100
+rate_limit_window = "1m"

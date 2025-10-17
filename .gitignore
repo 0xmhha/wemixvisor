@@ -13,13 +13,24 @@ wemixvisor
 *.out
 coverage.txt
 coverage.html
+coverage_functions.txt
+coverage.json
+coverage.xml
 
 # Dependency directories
 vendor/
 
+# Go module cache
+.gomodcache/
+go.sum.bak
+
 # Go workspace files
 go.work
 go.work.sum
+
+# Go build cache
+.cache/
+go-build/
 
 # IDE specific files
 .idea/
@@ -31,7 +42,11 @@ go.work.sum
 
 # Environment variables
 .env
+.env.*
 .env.local
+.env.production
+.env.development
+*.env
 
 # Build directories
 dist/
@@ -41,12 +56,17 @@ bin/
 # Debug files
 debug
 debug.test
+
+# Log files
 *.log
+logs/
+*.log.*
 
 # Temporary files
 tmp/
 temp/
 *.tmp
+*.bak
 
 # Test data
 testdata/backups/
@@ -61,9 +81,20 @@ config.local.yaml
 data/
 .wemixd/
 
+# Wemixvisor runtime directories
+backups/
+upgrades/
+profiles/
+current/
+
 # Profiling data
 *.prof
 *.pprof
+cpu.prof
+heap.prof
+goroutine.prof
+block.prof
+mutex.prof
 
 # Generated files
 *.generated.go
@@ -72,5 +103,35 @@ data/
 docs/_build/
 docs/.doctrees/
 
+# Phase 7: Monitoring & Alerting data
+metrics.db
+alerts.db
+*.db
+*.db-shm
+*.db-wal
+
+# Phase 7: API & WebSocket
+api.sock
+*.sock
+*.pid
+
+# Phase 7: Performance data
+*.trace
+trace.out
+
+# Prometheus data
+prometheus_data/
+tsdb/
+
 # Development guidelines (local only)
 CLAUDE.md
+
+# OS specific
+Thumbs.db
+Desktop.ini
+
+# Archive files
+*.tar.gz
+*.zip
+*.7z
+*.rar

@@ -1,0 +1,163 @@
+# Wemixvisor Advanced Configuration Example
+# Full configuration with all Phase 7 features enabled
+
+[daemon]
+home = "/opt/wemixd"
+name = "wemixd"
+allow_download_binaries = true
+restart_after_upgrade = true
+unsafe_skip_backup = false
+
+# Pre-upgrade hook (optional)
+pre_upgrade = "/opt/wemixd/scripts/pre-upgrade.sh"
+
+# Post-upgrade hook (optional)
+post_upgrade = "/opt/wemixd/scripts/post-upgrade.sh"
+
+[node]
+rpc_address = "http://localhost:26657"
+api_address = "http://localhost:1317"
+grpc_address = "localhost:9090"
+
+[monitoring]
+# API Server
+enable_api = true
+api_port = 8080
+
+# Metrics Collection
+enable_metrics = true
+metrics_interval = 10
+enable_system_metrics = true
+enable_process_metrics = true
+enable_chain_metrics = true
+
+# Metrics Export
+enable_prometheus = true
+prometheus_port = 9090
+prometheus_path = "/metrics"
+
+# Performance Profiling
+enable_profiling = false
+profile_dir = "/opt/wemixd/profiles"
+
+[governance]
+enable_governance = true
+poll_interval = 30
+enable_notifications = true
+
+# Automatic voting (if enabled)
+auto_vote = false
+vote_option = "yes"  # yes, no, abstain, no_with_veto
+
+[alerting]
+# Enable alerting system
+enabled = true
+
+# Alert evaluation interval
+evaluation_interval = "10s"
+
+# Alert retention period
+alert_retention = "24h"
+
+# Email notifications
+[alerting.email]
+enabled = false
+smtp_server = "smtp.gmail.com"
+smtp_port = 587
+from = "alerts@example.com"
+to = ["admin@example.com"]
+username = "alerts@example.com"
+password = ""  # Use environment variable: WEMIXVISOR_ALERT_EMAIL_PASSWORD
+
+# Slack notifications
+[alerting.slack]
+enabled = false
+webhook_url = ""  # Use environment variable: WEMIXVISOR_ALERT_SLACK_WEBHOOK
+
+# Discord notifications
+[alerting.discord]
+enabled = false
+webhook_url = ""  # Use environment variable: WEMIXVISOR_ALERT_DISCORD_WEBHOOK
+
+# Generic webhook notifications
+[alerting.webhook]
+enabled = false
+url = ""  # Use environment variable: WEMIXVISOR_ALERT_WEBHOOK_URL
+timeout = 10
+
+# Alert Rules
+[[alerting.rules]]
+name = "high_cpu_usage"
+condition = "cpu_usage > 80"
+severity = "warning"
+for = "5m"
+message = "CPU usage is above 80%"
+
+[[alerting.rules]]
+name = "low_disk_space"
+condition = "disk_usage > 90"
+severity = "critical"
+for = "1m"
+message = "Disk usage is above 90%"
+
+[[alerting.rules]]
+name = "high_memory_usage"
+condition = "memory_usage > 85"
+severity = "warning"
+for = "5m"
+message = "Memory usage is above 85%"
+
+[[alerting.rules]]
+name = "upgrade_available"
+condition = "upgrade_pending > 0"
+severity = "info"
+for = "0s"
+message = "New upgrade available"
+
+[backup]
+# Enable automatic backups before upgrades
+enabled = true
+
+# Backup directory
+dir = "/opt/wemixd/backups"
+
+# Maximum number of backups to keep
+max_backups = 5
+
+# Compress backups
+compress = true
+
+[performance]
+# Enable performance optimizations
+enabled = true
+
+# Connection pool size
+connection_pool_size = 100
+
+# Worker pool size
+worker_pool_size = 10
+
+# Enable caching
+enable_cache = true
+cache_size = 1000
+cache_ttl = "5m"
+
+# GC tuning
+gc_percent = 100
+
+[logging]
+level = "info"
+color = true
+file = "/opt/wemixd/logs/wemixvisor.log"
+max_size = 100
+max_backups = 10
+max_age = 30
+
+# JSON format for structured logging
+json = false
+
+# Include caller information in logs
+caller = true
+
+# Include stack traces for errors
+stacktrace = true

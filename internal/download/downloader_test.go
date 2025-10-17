@@ -283,8 +283,8 @@ func TestEnsureUpgradeBinary(t *testing.T) {
 
 	tmpDir := t.TempDir()
 	cfg := &config.Config{
-		Home: tmpDir,
-		Name: "wemixd",
+		Home:                  tmpDir,
+		Name:                  "wemixd",
 		AllowDownloadBinaries: true,
 		DownloadURLs: map[string]string{
 			"v2.0.0": server.URL + "/v2.0.0/wemixd",
@@ -319,8 +319,8 @@ func TestEnsureUpgradeBinary(t *testing.T) {
 func TestEnsureUpgradeBinaryDisabled(t *testing.T) {
 	tmpDir := t.TempDir()
 	cfg := &config.Config{
-		Home: tmpDir,
-		Name: "wemixd",
+		Home:                  tmpDir,
+		Name:                  "wemixd",
 		AllowDownloadBinaries: false, // Downloads disabled
 	}
 	logger, _ := logger.New(false, true, "")
