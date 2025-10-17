@@ -35,5 +35,10 @@ It manages the lifecycle of the node binary, handling upgrades seamlessly.`,
 	cmd.AddCommand(NewStopCommand(cfg, logger))
 	cmd.AddCommand(NewRestartCommand(cfg, logger))
 
+	// Phase 7: Advanced monitoring and management commands
+	cmd.AddCommand(NewAPICommand(cfg, logger))
+	cmd.AddCommand(NewMetricsCommand(cfg, logger))
+	cmd.AddCommand(NewProfileCommand(cfg, logger))
+
 	return cmd
 }

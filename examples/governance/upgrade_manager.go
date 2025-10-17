@@ -1,3 +1,6 @@
+//go:build ignore
+// +build ignore
+
 // Package main demonstrates upgrade management with governance
 package main
 

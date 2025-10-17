@@ -67,10 +67,55 @@ type Config struct {
 	ColorLogs       bool   `mapstructure:"cosmovisor_color_logs"`
 	TimeFormatLogs  string `mapstructure:"cosmovisor_timeformat_logs"`
 
+	// Phase 7: Metrics settings
+	MetricsEnabled          bool          `mapstructure:"metrics_enabled"`
+	MetricsPort             int           `mapstructure:"metrics_port"`
+	MetricsPath             string        `mapstructure:"metrics_path"`
+	MetricsCollectionInterval time.Duration `mapstructure:"metrics_collection_interval"`
+	EnableSystemMetrics     bool          `mapstructure:"enable_system_metrics"`
+	EnableAppMetrics        bool          `mapstructure:"enable_app_metrics"`
+	EnableGovMetrics        bool          `mapstructure:"enable_gov_metrics"`
+	EnablePerfMetrics       bool          `mapstructure:"enable_perf_metrics"`
+
+	// Phase 7: API Server settings
+	APIEnabled      bool     `mapstructure:"api_enabled"`
+	APIPort         int      `mapstructure:"api_port"`
+	APIHost         string   `mapstructure:"api_host"`
+	APIEnableAuth   bool     `mapstructure:"api_enable_auth"`
+	APIKey          string   `mapstructure:"api_key"`
+	APIJWTSecret    string   `mapstructure:"api_jwt_secret"`
+	APICORSOrigins  []string `mapstructure:"api_cors_origins"`
+	APIRateLimit    int      `mapstructure:"api_rate_limit"`
+
+	// Phase 7: Alerting settings
+	AlertingEnabled         bool          `mapstructure:"alerting_enabled"`
+	AlertingEvalInterval    time.Duration `mapstructure:"alerting_evaluation_interval"`
+	AlertingRetention       time.Duration `mapstructure:"alerting_retention"`
+	AlertingChannels        []string      `mapstructure:"alerting_channels"`
+
+	// Phase 7: Performance settings
+	EnableCaching       bool          `mapstructure:"enable_caching"`
+	CacheSize           int           `mapstructure:"cache_size"`
+	CacheTTL            time.Duration `mapstructure:"cache_ttl"`
+	EnablePooling       bool          `mapstructure:"enable_pooling"`
+	MaxConnections      int           `mapstructure:"max_connections"`
+	MaxWorkers          int           `mapstructure:"max_workers"`
+	EnableGCTuning      bool          `mapstructure:"enable_gc_tuning"`
+	GCPercent           int           `mapstructure:"gc_percent"`
+	EnableProfiling     bool          `mapstructure:"enable_profiling"`
+	ProfileInterval     time.Duration `mapstructure:"profile_interval"`
+
+	// Phase 7: Debug settings
+	Debug           bool `mapstructure:"debug"`
+
+	// Governance settings
+	GovernanceEnabled bool `mapstructure:"governance_enabled"`
+
 	// CLI options
 	Daemon      bool `mapstructure:"daemon"`       // Run in background
 	JSONOutput  bool `mapstructure:"json_output"`  // Output in JSON format
 	Quiet       bool `mapstructure:"quiet"`        // Suppress output
+
 	// Configuration version
 	ConfigVersion string `mapstructure:"config_version"`
 }
@@ -109,6 +154,50 @@ func DefaultConfig() *Config {
 		DisableLogs:              false,
 		ColorLogs:                true,
 		TimeFormatLogs:           "kitchen",
+
+		// Phase 7: Metrics defaults
+		MetricsEnabled:            false,
+		MetricsPort:               9090,
+		MetricsPath:               "/metrics",
+		MetricsCollectionInterval: 15 * time.Second,
+		EnableSystemMetrics:       true,
+		EnableAppMetrics:          true,
+		EnableGovMetrics:          true,
+		EnablePerfMetrics:         true,
+
+		// Phase 7: API Server defaults
+		APIEnabled:      false,
+		APIPort:         8080,
+		APIHost:         "0.0.0.0",
+		APIEnableAuth:   false,
+		APIKey:          "",
+		APIJWTSecret:    "",
+		APICORSOrigins:  []string{"*"},
+		APIRateLimit:    100,
+
+		// Phase 7: Alerting defaults
+		AlertingEnabled:      false,
+		AlertingEvalInterval: 30 * time.Second,
+		AlertingRetention:    24 * time.Hour,
+		AlertingChannels:     []string{},
+
+		// Phase 7: Performance defaults
+		EnableCaching:       true,
+		CacheSize:           1000,
+		CacheTTL:            1 * time.Hour,
+		EnablePooling:       true,
+		MaxConnections:      100,
+		MaxWorkers:          10,
+		EnableGCTuning:      false,
+		GCPercent:           100,
+		EnableProfiling:     false,
+		ProfileInterval:     30 * time.Second,
+
+		// Phase 7: Debug defaults
+		Debug:             false,
+		GovernanceEnabled: false,
+
+		ConfigVersion: "0.7.0",
 	}
 }
 

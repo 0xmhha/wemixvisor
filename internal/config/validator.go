@@ -19,6 +19,8 @@ type ValidationRule interface {
 }
 
 // Validator validates configuration
+var portAvailabilityCheck = isPortAvailable
+
 type Validator struct {
 	rules  []ValidationRule
 	logger *logger.Logger
@@ -303,7 +305,7 @@ func (r *portValidationRule) Validate(cfg *Config) error {
 		}
 
 		// Check if port is available
-		if !isPortAvailable(cfg.RPCPort) {
+		if !portAvailabilityCheck(cfg.RPCPort) {
 			return fmt.Errorf("RPC port %d is already in use", cfg.RPCPort)
 		}
 	}

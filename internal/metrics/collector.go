@@ -2,205 +2,604 @@ package metrics
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
 	"runtime"
 	"sync"
 	"time"
 
-	"go.uber.org/zap"
-	"github.com/wemix/wemixvisor/internal/config"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/shirou/gopsutil/v3/cpu"
+	"github.com/shirou/gopsutil/v3/disk"
+	"github.com/shirou/gopsutil/v3/mem"
+	"github.com/shirou/gopsutil/v3/net"
 	"github.com/wemix/wemixvisor/pkg/logger"
 )
 
-// Metrics represents system metrics
-type Metrics struct {
-	Timestamp      time.Time `json:"timestamp"`
-	NodeUptime     int64     `json:"node_uptime_seconds"`
-	RestartCount   int       `json:"restart_count"`
-	MemoryUsageMB  float64   `json:"memory_usage_mb"`
-	CPUUsagePercent float64  `json:"cpu_usage_percent"`
-	DiskUsageGB    float64   `json:"disk_usage_gb"`
-	PeerCount      int       `json:"peer_count"`
-	BlockHeight    int64     `json:"block_height"`
-	SyncProgress   float64   `json:"sync_progress"`
-	Healthy        bool      `json:"healthy"`
+// Collector collects various metrics from the system and application
+type Collector struct {
+	config *CollectorConfig
+	logger *logger.Logger
+
+	// Prometheus metrics
+	registry *prometheus.Registry
+
+	// System metrics
+	cpuUsage    prometheus.Gauge
+	memoryUsage prometheus.Gauge
+	diskUsage   prometheus.Gauge
+	goroutines  prometheus.Gauge
+
+	// Network metrics
+	networkRxBytes prometheus.Counter
+	networkTxBytes prometheus.Counter
+
+	// Application metrics
+	upgradeTotal   prometheus.Counter
+	upgradeSuccess prometheus.Counter
+	upgradeFailed  prometheus.Counter
+	upgradePending prometheus.Gauge
+
+	// Process metrics
+	processRestarts prometheus.Counter
+	processUptime   prometheus.Gauge
+
+	// Node metrics
+	nodeHeight  prometheus.Gauge
+	nodePeers   prometheus.Gauge
+	nodeSyncing prometheus.Gauge
+
+	// Governance metrics
+	proposalTotal    prometheus.Gauge
+	proposalVoting   prometheus.Gauge
+	proposalPassed   prometheus.Counter
+	proposalRejected prometheus.Counter
+
+	// Voting metrics
+	votingPower   prometheus.Gauge
+	votingTurnout prometheus.Gauge
+
+	// Validator metrics
+	validatorActive prometheus.Gauge
+	validatorJailed prometheus.Gauge
+
+	// Performance metrics
+	rpcLatency prometheus.Histogram
+	apiLatency prometheus.Histogram
+	tps        prometheus.Gauge
+
+	// Internal state
+	mu            sync.RWMutex
+	ctx           context.Context
+	cancel        context.CancelFunc
+	lastSnapshot  *MetricsSnapshot
+	startTime     time.Time
+
+	// Callbacks for application-specific metrics
+	nodeHeightFunc    func() (int64, error)
+	nodePeersFunc     func() (int, error)
+	nodeSyncingFunc   func() (bool, error)
+	proposalStatsFunc func() (*GovernanceMetrics, error)
 }
 
-// MetricsCollector collects and stores system metrics
-type MetricsCollector struct {
-	config   *config.Config
-	logger   *logger.Logger
-	nodeInfo NodeInfoProvider
+// NewCollector creates a new metrics collector
+func NewCollector(config *CollectorConfig, logger *logger.Logger) *Collector {
+	registry := prometheus.NewRegistry()
 
-	// Metrics storage
-	currentMetrics Metrics
-	metricsMutex   sync.RWMutex
-
-	// Collection control
-	ctx              context.Context
-	cancel           context.CancelFunc
-	collectionTicker *time.Ticker
-}
-
-// NodeInfoProvider provides node information for metrics
-type NodeInfoProvider interface {
-	GetUptime() time.Duration
-	GetRestartCount() int
-	IsHealthy() bool
-	GetPID() int
-}
-
-// NewMetricsCollector creates a new metrics collector
-func NewMetricsCollector(cfg *config.Config, logger *logger.Logger, nodeInfo NodeInfoProvider) *MetricsCollector {
-	ctx, cancel := context.WithCancel(context.Background())
-
-	interval := 60 * time.Second // Default 1 minute
-	if cfg.MetricsInterval > 0 {
-		interval = cfg.MetricsInterval
+	c := &Collector{
+		config:    config,
+		logger:    logger,
+		registry:  registry,
+		startTime: time.Now(),
 	}
 
-	return &MetricsCollector{
-		config:           cfg,
-		logger:           logger,
-		nodeInfo:         nodeInfo,
-		ctx:              ctx,
-		cancel:           cancel,
-		collectionTicker: time.NewTicker(interval),
+	// Initialize Prometheus metrics
+	c.initPrometheusMetrics()
+
+	// Register metrics with registry
+	c.registerMetrics()
+
+	return c
+}
+
+// initPrometheusMetrics initializes all Prometheus metrics
+func (c *Collector) initPrometheusMetrics() {
+	// System metrics
+	c.cpuUsage = prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "wemixvisor_cpu_usage_percent",
+		Help: "Current CPU usage percentage",
+	})
+
+	c.memoryUsage = prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "wemixvisor_memory_usage_percent",
+		Help: "Current memory usage percentage",
+	})
+
+	c.diskUsage = prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "wemixvisor_disk_usage_percent",
+		Help: "Current disk usage percentage",
+	})
+
+	c.goroutines = prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "wemixvisor_goroutines",
+		Help: "Number of goroutines",
+	})
+
+	// Network metrics
+	c.networkRxBytes = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "wemixvisor_network_rx_bytes_total",
+		Help: "Total network bytes received",
+	})
+
+	c.networkTxBytes = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "wemixvisor_network_tx_bytes_total",
+		Help: "Total network bytes transmitted",
+	})
+
+	// Application metrics
+	c.upgradeTotal = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "wemixvisor_upgrades_total",
+		Help: "Total number of upgrades attempted",
+	})
+
+	c.upgradeSuccess = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "wemixvisor_upgrades_success_total",
+		Help: "Total number of successful upgrades",
+	})
+
+	c.upgradeFailed = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "wemixvisor_upgrades_failed_total",
+		Help: "Total number of failed upgrades",
+	})
+
+	c.upgradePending = prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "wemixvisor_upgrades_pending",
+		Help: "Number of pending upgrades",
+	})
+
+	// Process metrics
+	c.processRestarts = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "wemixvisor_process_restarts_total",
+		Help: "Total number of process restarts",
+	})
+
+	c.processUptime = prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "wemixvisor_process_uptime_seconds",
+		Help: "Process uptime in seconds",
+	})
+
+	// Node metrics
+	c.nodeHeight = prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "wemixvisor_node_height",
+		Help: "Current blockchain height",
+	})
+
+	c.nodePeers = prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "wemixvisor_node_peers",
+		Help: "Number of connected peers",
+	})
+
+	c.nodeSyncing = prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "wemixvisor_node_syncing",
+		Help: "Whether node is syncing (1) or not (0)",
+	})
+
+	// Governance metrics
+	c.proposalTotal = prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "wemixvisor_proposals_total",
+		Help: "Total number of proposals",
+	})
+
+	c.proposalVoting = prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "wemixvisor_proposals_voting",
+		Help: "Number of proposals in voting period",
+	})
+
+	c.proposalPassed = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "wemixvisor_proposals_passed_total",
+		Help: "Total number of passed proposals",
+	})
+
+	c.proposalRejected = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "wemixvisor_proposals_rejected_total",
+		Help: "Total number of rejected proposals",
+	})
+
+	// Voting metrics
+	c.votingPower = prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "wemixvisor_voting_power",
+		Help: "Current voting power",
+	})
+
+	c.votingTurnout = prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "wemixvisor_voting_turnout_percent",
+		Help: "Average voting turnout percentage",
+	})
+
+	// Validator metrics
+	c.validatorActive = prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "wemixvisor_validators_active",
+		Help: "Number of active validators",
+	})
+
+	c.validatorJailed = prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "wemixvisor_validators_jailed",
+		Help: "Number of jailed validators",
+	})
+
+	// Performance metrics
+	c.rpcLatency = prometheus.NewHistogram(prometheus.HistogramOpts{
+		Name:    "wemixvisor_rpc_latency_milliseconds",
+		Help:    "RPC call latency in milliseconds",
+		Buckets: prometheus.DefBuckets,
+	})
+
+	c.apiLatency = prometheus.NewHistogram(prometheus.HistogramOpts{
+		Name:    "wemixvisor_api_latency_milliseconds",
+		Help:    "API call latency in milliseconds",
+		Buckets: prometheus.DefBuckets,
+	})
+
+	c.tps = prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "wemixvisor_transactions_per_second",
+		Help: "Transactions per second",
+	})
+}
+
+// registerMetrics registers all metrics with the Prometheus registry
+func (c *Collector) registerMetrics() {
+	// System metrics
+	if c.config.EnableSystemMetrics {
+		c.registry.MustRegister(c.cpuUsage)
+		c.registry.MustRegister(c.memoryUsage)
+		c.registry.MustRegister(c.diskUsage)
+		c.registry.MustRegister(c.goroutines)
+		c.registry.MustRegister(c.networkRxBytes)
+		c.registry.MustRegister(c.networkTxBytes)
+	}
+
+	// Application metrics
+	if c.config.EnableAppMetrics {
+		c.registry.MustRegister(c.upgradeTotal)
+		c.registry.MustRegister(c.upgradeSuccess)
+		c.registry.MustRegister(c.upgradeFailed)
+		c.registry.MustRegister(c.upgradePending)
+		c.registry.MustRegister(c.processRestarts)
+		c.registry.MustRegister(c.processUptime)
+		c.registry.MustRegister(c.nodeHeight)
+		c.registry.MustRegister(c.nodePeers)
+		c.registry.MustRegister(c.nodeSyncing)
+	}
+
+	// Governance metrics
+	if c.config.EnableGovMetrics {
+		c.registry.MustRegister(c.proposalTotal)
+		c.registry.MustRegister(c.proposalVoting)
+		c.registry.MustRegister(c.proposalPassed)
+		c.registry.MustRegister(c.proposalRejected)
+		c.registry.MustRegister(c.votingPower)
+		c.registry.MustRegister(c.votingTurnout)
+		c.registry.MustRegister(c.validatorActive)
+		c.registry.MustRegister(c.validatorJailed)
+	}
+
+	// Performance metrics
+	if c.config.EnablePerfMetrics {
+		c.registry.MustRegister(c.rpcLatency)
+		c.registry.MustRegister(c.apiLatency)
+		c.registry.MustRegister(c.tps)
 	}
 }
 
-// Start begins metrics collection
-func (c *MetricsCollector) Start() {
-	c.logger.Info("starting metrics collection")
-
-	// Start collection loop (initial metrics will be collected in the goroutine)
-	// This prevents deadlock when called while Manager holds a lock
-	go c.run()
-}
-
-// Stop stops metrics collection
-func (c *MetricsCollector) Stop() {
-	c.logger.Info("stopping metrics collection")
-	c.cancel()
-	if c.collectionTicker != nil {
-		c.collectionTicker.Stop()
+// Start starts the metrics collection
+func (c *Collector) Start() error {
+	if !c.config.Enabled {
+		c.logger.Info("Metrics collection is disabled")
+		return nil
 	}
+
+	c.ctx, c.cancel = context.WithCancel(context.Background())
+
+	// Start collection loop
+	go c.collectionLoop()
+
+	c.logger.Info("Metrics collector started",
+		"interval", c.config.CollectionInterval,
+		"prometheus_port", c.config.PrometheusPort)
+
+	return nil
 }
 
-// GetMetrics returns the current metrics
-func (c *MetricsCollector) GetMetrics() Metrics {
-	c.metricsMutex.RLock()
-	defer c.metricsMutex.RUnlock()
-	return c.currentMetrics
+// Stop stops the metrics collection
+func (c *Collector) Stop() error {
+	if c.cancel != nil {
+		c.cancel()
+	}
+
+	c.logger.Info("Metrics collector stopped")
+	return nil
 }
 
-// run is the main collection loop
-func (c *MetricsCollector) run() {
-	// Collect initial metrics
-	c.collectMetrics()
+// collectionLoop runs the periodic metrics collection
+func (c *Collector) collectionLoop() {
+	ticker := time.NewTicker(c.config.CollectionInterval)
+	defer ticker.Stop()
+
+	// Collect immediately on start
+	c.collect()
 
 	for {
 		select {
 		case <-c.ctx.Done():
 			return
-		case <-c.collectionTicker.C:
-			c.collectMetrics()
+		case <-ticker.C:
+			c.collect()
 		}
 	}
 }
 
-// collectMetrics collects current system metrics
-func (c *MetricsCollector) collectMetrics() {
-	c.logger.Debug("collecting metrics")
-
-	metrics := Metrics{
-		Timestamp:    time.Now(),
-		RestartCount: c.nodeInfo.GetRestartCount(),
-		Healthy:      c.nodeInfo.IsHealthy(),
+// collect gathers all metrics
+func (c *Collector) collect() {
+	snapshot := &MetricsSnapshot{
+		Timestamp: time.Now(),
 	}
 
-	// Node uptime
-	if uptime := c.nodeInfo.GetUptime(); uptime > 0 {
-		metrics.NodeUptime = int64(uptime.Seconds())
+	// Collect system metrics
+	if c.config.EnableSystemMetrics {
+		snapshot.System = c.collectSystemMetrics()
+		c.updateSystemPrometheus(snapshot.System)
+	}
+
+	// Collect application metrics
+	if c.config.EnableAppMetrics {
+		snapshot.Application = c.collectApplicationMetrics()
+		c.updateApplicationPrometheus(snapshot.Application)
+	}
+
+	// Collect governance metrics
+	if c.config.EnableGovMetrics {
+		snapshot.Governance = c.collectGovernanceMetrics()
+		c.updateGovernancePrometheus(snapshot.Governance)
+	}
+
+	// Collect performance metrics
+	if c.config.EnablePerfMetrics {
+		snapshot.Performance = c.collectPerformanceMetrics()
+		c.updatePerformancePrometheus(snapshot.Performance)
+	}
+
+	// Store snapshot
+	c.mu.Lock()
+	c.lastSnapshot = snapshot
+	c.mu.Unlock()
+
+	c.logger.Debug("Metrics collected", "timestamp", snapshot.Timestamp)
+}
+
+// collectSystemMetrics collects system-level metrics
+func (c *Collector) collectSystemMetrics() *SystemMetrics {
+	metrics := &SystemMetrics{
+		Timestamp: time.Now(),
+	}
+
+	// CPU usage
+	if cpuPercent, err := cpu.Percent(time.Second, false); err == nil && len(cpuPercent) > 0 {
+		metrics.CPUUsage = cpuPercent[0]
 	}
 
 	// Memory usage
-	var memStats runtime.MemStats
-	runtime.ReadMemStats(&memStats)
-	metrics.MemoryUsageMB = float64(memStats.Alloc) / (1024 * 1024)
+	if memStat, err := mem.VirtualMemory(); err == nil {
+		metrics.MemoryUsage = memStat.UsedPercent
+		metrics.MemoryTotal = memStat.Total
+		metrics.MemoryAvailable = memStat.Available
+	}
 
-	// TODO: Add CPU usage collection (requires platform-specific code)
-	metrics.CPUUsagePercent = 0.0
+	// Disk usage
+	if diskStat, err := disk.Usage("/"); err == nil {
+		metrics.DiskUsage = diskStat.UsedPercent
+		metrics.DiskTotal = diskStat.Total
+		metrics.DiskAvailable = diskStat.Free
+	}
 
-	// TODO: Add disk usage collection
-	metrics.DiskUsageGB = 0.0
+	// Network stats
+	if netStats, err := net.IOCounters(false); err == nil && len(netStats) > 0 {
+		metrics.NetworkRxBytes = netStats[0].BytesRecv
+		metrics.NetworkTxBytes = netStats[0].BytesSent
+		metrics.NetworkRxPackets = netStats[0].PacketsRecv
+		metrics.NetworkTxPackets = netStats[0].PacketsSent
+	}
 
-	// TODO: Add RPC-based metrics (peer count, block height, sync progress)
-	metrics.PeerCount = 0
-	metrics.BlockHeight = 0
-	metrics.SyncProgress = 0.0
+	// Goroutines
+	metrics.Goroutines = runtime.NumGoroutine()
 
-	// Store metrics
-	c.metricsMutex.Lock()
-	c.currentMetrics = metrics
-	c.metricsMutex.Unlock()
+	// Uptime
+	metrics.Uptime = int64(time.Since(c.startTime).Seconds())
 
-	c.logger.Debug("metrics collected",
-		zap.Time("timestamp", metrics.Timestamp),
-		zap.Int64("uptime", metrics.NodeUptime),
-		zap.Float64("memory_mb", metrics.MemoryUsageMB),
-		zap.Bool("healthy", metrics.Healthy))
+	return metrics
 }
 
-// ExportMetrics exports metrics in a specific format
-func (c *MetricsCollector) ExportMetrics(format string) ([]byte, error) {
-	metrics := c.GetMetrics()
+// collectApplicationMetrics collects application-level metrics
+func (c *Collector) collectApplicationMetrics() *ApplicationMetrics {
+	metrics := &ApplicationMetrics{
+		Timestamp:     time.Now(),
+		ProcessUptime: int64(time.Since(c.startTime).Seconds()),
+	}
 
-	switch format {
-	case "prometheus":
-		return c.exportPrometheus(metrics)
-	case "json":
-		return c.exportJSON(metrics)
-	default:
-		return c.exportJSON(metrics)
+	// Node metrics (if callbacks are set)
+	if c.nodeHeightFunc != nil {
+		if height, err := c.nodeHeightFunc(); err == nil {
+			metrics.NodeHeight = height
+		}
+	}
+
+	if c.nodePeersFunc != nil {
+		if peers, err := c.nodePeersFunc(); err == nil {
+			metrics.NodePeers = peers
+		}
+	}
+
+	if c.nodeSyncingFunc != nil {
+		if syncing, err := c.nodeSyncingFunc(); err == nil {
+			metrics.NodeSyncing = syncing
+		}
+	}
+
+	return metrics
+}
+
+// collectGovernanceMetrics collects governance-related metrics
+func (c *Collector) collectGovernanceMetrics() *GovernanceMetrics {
+	metrics := &GovernanceMetrics{
+		Timestamp: time.Now(),
+	}
+
+	// Get governance stats from callback
+	if c.proposalStatsFunc != nil {
+		if stats, err := c.proposalStatsFunc(); err == nil {
+			return stats
+		}
+	}
+
+	return metrics
+}
+
+// collectPerformanceMetrics collects performance-related metrics
+func (c *Collector) collectPerformanceMetrics() *PerformanceMetrics {
+	return &PerformanceMetrics{
+		Timestamp: time.Now(),
+		// Performance metrics are typically updated via ObserveXXX methods
 	}
 }
 
-// exportJSON exports metrics as JSON
-func (c *MetricsCollector) exportJSON(metrics Metrics) ([]byte, error) {
-	return json.MarshalIndent(metrics, "", "  ")
-}
-
-// exportPrometheus exports metrics in Prometheus format
-func (c *MetricsCollector) exportPrometheus(metrics Metrics) ([]byte, error) {
-	result := fmt.Sprintf(`# HELP wemixvisor_uptime_seconds Node uptime in seconds
-# TYPE wemixvisor_uptime_seconds gauge
-wemixvisor_uptime_seconds %d
-
-# HELP wemixvisor_restart_count Total number of node restarts
-# TYPE wemixvisor_restart_count counter
-wemixvisor_restart_count %d
-
-# HELP wemixvisor_memory_usage_mb Memory usage in megabytes
-# TYPE wemixvisor_memory_usage_mb gauge
-wemixvisor_memory_usage_mb %.2f
-
-# HELP wemixvisor_healthy Node health status (1=healthy, 0=unhealthy)
-# TYPE wemixvisor_healthy gauge
-wemixvisor_healthy %d
-`,
-		metrics.NodeUptime,
-		metrics.RestartCount,
-		metrics.MemoryUsageMB,
-		boolToInt(metrics.Healthy))
-	return []byte(result), nil
-}
-
-// boolToInt converts boolean to integer for metrics
-func boolToInt(b bool) int {
-	if b {
-		return 1
+// updateSystemPrometheus updates Prometheus metrics for system
+func (c *Collector) updateSystemPrometheus(metrics *SystemMetrics) {
+	if metrics == nil {
+		return
 	}
-	return 0
+
+	c.cpuUsage.Set(metrics.CPUUsage)
+	c.memoryUsage.Set(metrics.MemoryUsage)
+	c.diskUsage.Set(metrics.DiskUsage)
+	c.goroutines.Set(float64(metrics.Goroutines))
+	c.networkRxBytes.Add(float64(metrics.NetworkRxBytes))
+	c.networkTxBytes.Add(float64(metrics.NetworkTxBytes))
+}
+
+// updateApplicationPrometheus updates Prometheus metrics for application
+func (c *Collector) updateApplicationPrometheus(metrics *ApplicationMetrics) {
+	if metrics == nil {
+		return
+	}
+
+	c.processUptime.Set(float64(metrics.ProcessUptime))
+	c.nodeHeight.Set(float64(metrics.NodeHeight))
+	c.nodePeers.Set(float64(metrics.NodePeers))
+	if metrics.NodeSyncing {
+		c.nodeSyncing.Set(1)
+	} else {
+		c.nodeSyncing.Set(0)
+	}
+}
+
+// updateGovernancePrometheus updates Prometheus metrics for governance
+func (c *Collector) updateGovernancePrometheus(metrics *GovernanceMetrics) {
+	if metrics == nil {
+		return
+	}
+
+	c.proposalTotal.Set(float64(metrics.ProposalTotal))
+	c.proposalVoting.Set(float64(metrics.ProposalVoting))
+	c.votingPower.Set(metrics.VotingPower)
+	c.votingTurnout.Set(metrics.VotingTurnout)
+	c.validatorActive.Set(float64(metrics.ValidatorActive))
+	c.validatorJailed.Set(float64(metrics.ValidatorJailed))
+}
+
+// updatePerformancePrometheus updates Prometheus metrics for performance
+func (c *Collector) updatePerformancePrometheus(metrics *PerformanceMetrics) {
+	if metrics == nil {
+		return
+	}
+
+	c.tps.Set(metrics.TransactionsPerSecond)
+}
+
+// GetSnapshot returns the latest metrics snapshot
+func (c *Collector) GetSnapshot() *MetricsSnapshot {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.lastSnapshot
+}
+
+// GetRegistry returns the Prometheus registry
+func (c *Collector) GetRegistry() *prometheus.Registry {
+	return c.registry
+}
+
+// SetNodeHeightCallback sets the callback for getting node height
+func (c *Collector) SetNodeHeightCallback(fn func() (int64, error)) {
+	c.nodeHeightFunc = fn
+}
+
+// SetNodePeersCallback sets the callback for getting node peers count
+func (c *Collector) SetNodePeersCallback(fn func() (int, error)) {
+	c.nodePeersFunc = fn
+}
+
+// SetNodeSyncingCallback sets the callback for getting node syncing status
+func (c *Collector) SetNodeSyncingCallback(fn func() (bool, error)) {
+	c.nodeSyncingFunc = fn
+}
+
+// SetProposalStatsCallback sets the callback for getting proposal statistics
+func (c *Collector) SetProposalStatsCallback(fn func() (*GovernanceMetrics, error)) {
+	c.proposalStatsFunc = fn
+}
+
+// IncrementUpgradeTotal increments the total upgrade counter
+func (c *Collector) IncrementUpgradeTotal() {
+	c.upgradeTotal.Inc()
+}
+
+// IncrementUpgradeSuccess increments the successful upgrade counter
+func (c *Collector) IncrementUpgradeSuccess() {
+	c.upgradeSuccess.Inc()
+}
+
+// IncrementUpgradeFailed increments the failed upgrade counter
+func (c *Collector) IncrementUpgradeFailed() {
+	c.upgradeFailed.Inc()
+}
+
+// SetUpgradePending sets the number of pending upgrades
+func (c *Collector) SetUpgradePending(count int) {
+	c.upgradePending.Set(float64(count))
+}
+
+// IncrementProcessRestarts increments the process restart counter
+func (c *Collector) IncrementProcessRestarts() {
+	c.processRestarts.Inc()
+}
+
+// ObserveRPCLatency records an RPC latency observation
+func (c *Collector) ObserveRPCLatency(latencyMS float64) {
+	c.rpcLatency.Observe(latencyMS)
+}
+
+// ObserveAPILatency records an API latency observation
+func (c *Collector) ObserveAPILatency(latencyMS float64) {
+	c.apiLatency.Observe(latencyMS)
+}
+
+// RecordError records an error metric
+func (c *Collector) RecordError(source string, err error) {
+	c.logger.Error("Metric error recorded",
+		"source", source,
+		"error", err.Error())
+}
+
+// GenerateAlert generates an alert based on metrics
+func (c *Collector) GenerateAlert(alert *Alert) {
+	c.logger.Warn("Alert generated",
+		"name", alert.Name,
+		"level", alert.Level,
+		"message", alert.Message)
 }

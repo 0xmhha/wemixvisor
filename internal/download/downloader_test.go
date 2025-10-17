@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"net/http"
-	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"testing"
@@ -39,7 +38,7 @@ func TestNewDownloader(t *testing.T) {
 func TestDownloadBinary(t *testing.T) {
 	// Create test server
 	content := []byte("test binary content")
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := newTestServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Length", fmt.Sprintf("%d", len(content)))
 		w.Write(content)
 	}))
@@ -82,7 +81,7 @@ func TestDownloadBinary(t *testing.T) {
 
 func TestDownloadBinaryWithError(t *testing.T) {
 	// Create test server that returns error
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := newTestServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 	}))
 	defer server.Close()
@@ -114,7 +113,7 @@ func TestDownloadAndVerify(t *testing.T) {
 	checksum := hex.EncodeToString(hash[:])
 
 	// Create test server
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := newTestServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/binary" {
 			w.Header().Set("Content-Length", fmt.Sprintf("%d", len(content)))
 			w.Write(content)
@@ -160,7 +159,7 @@ func TestDownloadAndVerifyChecksumMismatch(t *testing.T) {
 	wrongChecksum := "0000000000000000000000000000000000000000000000000000000000000000"
 
 	// Create test server
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := newTestServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/binary" {
 			w.Header().Set("Content-Length", fmt.Sprintf("%d", len(content)))
 			w.Write(content)
@@ -269,7 +268,7 @@ func TestEnsureUpgradeBinary(t *testing.T) {
 	hash := sha256.Sum256(content)
 	checksum := hex.EncodeToString(hash[:])
 
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := newTestServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/v2.0.0/wemixd" {
 			w.Header().Set("Content-Length", fmt.Sprintf("%d", len(content)))
 			w.Write(content)
@@ -283,8 +282,8 @@ func TestEnsureUpgradeBinary(t *testing.T) {
 
 	tmpDir := t.TempDir()
 	cfg := &config.Config{
-		Home: tmpDir,
-		Name: "wemixd",
+		Home:                  tmpDir,
+		Name:                  "wemixd",
 		AllowDownloadBinaries: true,
 		DownloadURLs: map[string]string{
 			"v2.0.0": server.URL + "/v2.0.0/wemixd",
@@ -319,8 +318,8 @@ func TestEnsureUpgradeBinary(t *testing.T) {
 func TestEnsureUpgradeBinaryDisabled(t *testing.T) {
 	tmpDir := t.TempDir()
 	cfg := &config.Config{
-		Home: tmpDir,
-		Name: "wemixd",
+		Home:                  tmpDir,
+		Name:                  "wemixd",
 		AllowDownloadBinaries: false, // Downloads disabled
 	}
 	logger, _ := logger.New(false, true, "")
