@@ -39,7 +39,7 @@ type Manager struct {
 	restartCount     int
 	maxRestarts      int
 	healthChecker    *monitor.HealthChecker
-	metricsCollector *metrics.MetricsCollector
+	metricsCollector *metrics.Collector
 
 	// Channels for lifecycle management
 	stopCh    chan struct{}
@@ -80,7 +80,25 @@ func NewManager(cfg *config.Config, logger *logger.Logger) *Manager {
 	}
 
 	// Create metrics collector
-	manager.metricsCollector = metrics.NewMetricsCollector(cfg, logger, manager)
+	if cfg.MetricsEnabled {
+		collectorConfig := &metrics.CollectorConfig{
+			Enabled:             true,
+			CollectionInterval:  cfg.MetricsCollectionInterval,
+			EnableSystemMetrics: cfg.EnableSystemMetrics,
+			EnableAppMetrics:    cfg.EnableAppMetrics,
+			EnableGovMetrics:    cfg.EnableGovMetrics,
+			EnablePerfMetrics:   cfg.EnablePerfMetrics,
+			PrometheusPort:      cfg.MetricsPort,
+			PrometheusPath:      cfg.MetricsPath,
+		}
+		manager.metricsCollector = metrics.NewCollector(collectorConfig, logger)
+
+		// Set callbacks for node-specific metrics
+		manager.metricsCollector.SetNodeHeightCallback(func() (int64, error) {
+			// TODO: implement actual height fetching
+			return 0, nil
+		})
+	}
 
 	return manager
 }
@@ -592,11 +610,11 @@ func (m *Manager) GetRestartCount() int {
 }
 
 // GetMetrics returns current metrics
-func (m *Manager) GetMetrics() metrics.Metrics {
+func (m *Manager) GetMetrics() *metrics.MetricsSnapshot {
 	if m.metricsCollector != nil {
-		return m.metricsCollector.GetMetrics()
+		return m.metricsCollector.GetSnapshot()
 	}
-	return metrics.Metrics{}
+	return nil
 }
 
 // Close gracefully shuts down the manager

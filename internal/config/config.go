@@ -23,7 +23,6 @@ type Config struct {
 	// Process management
 	ShutdownGrace time.Duration `mapstructure:"daemon_shutdown_grace"`
 	PollInterval  time.Duration `mapstructure:"daemon_poll_interval"`
-	MaxRestarts   int           `mapstructure:"max_restarts"`
 
 	// Phase 4: Node lifecycle management
 	RestartOnFailure    bool              `mapstructure:"daemon_restart_on_failure"`
@@ -46,17 +45,12 @@ type Config struct {
 
 	// WBFT specific settings
 	RPCAddress      string `mapstructure:"daemon_rpc_address"`
-	RPCPort         int    `mapstructure:"daemon_rpc_port"`
 	ValidatorMode   bool   `mapstructure:"validator_mode"`
 	DisableRecase   bool   `mapstructure:"cosmovisor_disable_recase"`
 
 	// Network settings
 	NetworkID uint64 `mapstructure:"network_id"`
 	ChainID   string `mapstructure:"chain_id"`
-
-	// Health monitoring
-	HealthCheckInterval time.Duration `mapstructure:"health_check_interval"`
-	MetricsInterval     time.Duration `mapstructure:"metrics_interval"`
 
 	// Download settings
 	DownloadURLs       map[string]string `mapstructure:"download_urls"`
@@ -104,9 +98,6 @@ type Config struct {
 	GCPercent           int           `mapstructure:"gc_percent"`
 	EnableProfiling     bool          `mapstructure:"enable_profiling"`
 	ProfileInterval     time.Duration `mapstructure:"profile_interval"`
-
-	// Phase 7: Debug settings
-	Debug           bool `mapstructure:"debug"`
 
 	// Governance settings
 	GovernanceEnabled bool `mapstructure:"governance_enabled"`
@@ -193,8 +184,6 @@ func DefaultConfig() *Config {
 		EnableProfiling:     false,
 		ProfileInterval:     30 * time.Second,
 
-		// Phase 7: Debug defaults
-		Debug:             false,
 		GovernanceEnabled: false,
 
 		ConfigVersion: "0.7.0",

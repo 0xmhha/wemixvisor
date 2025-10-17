@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
@@ -37,7 +38,7 @@ func TestNewClient(t *testing.T) {
 
 func TestGetCurrentHeight(t *testing.T) {
 	// Create mock RPC server
-	server := newTestServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Parse request
 		var req map[string]interface{}
 		json.NewDecoder(r.Body).Decode(&req)
@@ -113,7 +114,7 @@ func TestIsValidator(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			// Create mock RPC server
-			server := newTestServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				var req map[string]interface{}
 				json.NewDecoder(r.Body).Decode(&req)
 
@@ -163,7 +164,7 @@ func TestWaitForHeight(t *testing.T) {
 	targetHeight := int64(1003)
 
 	// Create mock RPC server that increments height
-	server := newTestServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var req map[string]interface{}
 		json.NewDecoder(r.Body).Decode(&req)
 
@@ -210,7 +211,7 @@ func TestWaitForHeight(t *testing.T) {
 
 func TestWaitForHeightTimeout(t *testing.T) {
 	// Create mock RPC server that returns fixed height
-	server := newTestServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var req map[string]interface{}
 		json.NewDecoder(r.Body).Decode(&req)
 
@@ -282,7 +283,7 @@ func TestCheckReadiness(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			// Create mock RPC server
-			server := newTestServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				var req map[string]interface{}
 				json.NewDecoder(r.Body).Decode(&req)
 
@@ -346,7 +347,7 @@ func TestMonitorConsensus(t *testing.T) {
 	height := int64(1000)
 
 	// Create mock RPC server
-	server := newTestServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var req map[string]interface{}
 		json.NewDecoder(r.Body).Decode(&req)
 
@@ -429,7 +430,7 @@ done:
 
 func TestRPCError(t *testing.T) {
 	// Create mock RPC server that returns an error
-	server := newTestServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		resp := map[string]interface{}{
 			"jsonrpc": "2.0",
 			"id":      1,
