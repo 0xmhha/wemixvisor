@@ -1,3 +1,0 @@
-{"level":"info","ts":"2025-09-29T19:53:55.321+0900","caller":"logger/logger.go:47","msg":"test info"}
-{"level":"warn","ts":"2025-09-29T19:53:55.321+0900","caller":"logger/logger.go:57","msg":"test warn"}
-{"level":"error","ts":"2025-09-29T19:53:55.321+0900","caller":"logger/logger.go:52","msg":"test error","stacktrace":"github.com/wemix/wemixvisor/pkg/logger.(*Logger).Error\n\t/Users/wm-it-22-00661/workspace/cosmovisor/wemixvisor/pkg/logger/logger.go:52\ngithub.com/wemix/wemixvisor/pkg/logger.TestNew.func1\n\t/Users/wm-it-22-00661/workspace/cosmovisor/wemixvisor/pkg/logger/logger_test.go:72\ntesting.tRunner\n\t/Users/wm-it-22-00661/.gvm/gos/go1.22.6/src/testing/testing.go:1689"}
