@@ -1,0 +1,73 @@
+# Wemixvisor Basic Configuration Example
+# This is a minimal configuration to get started with wemixvisor
+
+[daemon]
+# Home directory for wemixvisor (default: ~/.wemixd)
+home = "/opt/wemixd"
+
+# Name of the binary to manage (default: wemixd)
+name = "wemixd"
+
+# Allow automatic binary downloads during upgrades
+allow_download_binaries = false
+
+# Restart the daemon after an upgrade
+restart_after_upgrade = true
+
+# Skip backup during upgrade (NOT RECOMMENDED for production)
+unsafe_skip_backup = false
+
+[node]
+# RPC address for the node
+rpc_address = "http://localhost:26657"
+
+# API address for the node
+api_address = "http://localhost:1317"
+
+# gRPC address for the node
+grpc_address = "localhost:9090"
+
+[monitoring]
+# Enable API server for monitoring
+enable_api = true
+
+# API server port
+api_port = 8080
+
+# Enable metrics collection
+enable_metrics = true
+
+# Metrics collection interval (in seconds)
+metrics_interval = 10
+
+# Enable system metrics (CPU, memory, disk)
+enable_system_metrics = true
+
+[governance]
+# Enable governance monitoring
+enable_governance = true
+
+# Governance polling interval (in seconds)
+poll_interval = 30
+
+# Enable automatic proposal notifications
+enable_notifications = false
+
+[logging]
+# Log level (debug, info, warn, error)
+level = "info"
+
+# Enable colored logs
+color = true
+
+# Log file path (empty = stdout only)
+file = ""
+
+# Maximum log file size in MB
+max_size = 100
+
+# Maximum number of old log files to retain
+max_backups = 3
+
+# Maximum age of log files in days
+max_age = 28
