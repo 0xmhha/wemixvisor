@@ -5,18 +5,15 @@ import (
 	"os"
 	"path/filepath"
 
-	"go.uber.org/zap"
 	"github.com/spf13/cobra"
 	"github.com/wemix/wemixvisor/internal/config"
 	"github.com/wemix/wemixvisor/pkg/logger"
+	"go.uber.org/zap"
 )
 
 // NewInitCommand creates the init command
 func NewInitCommand(cfg *config.Config, logger *logger.Logger) *cobra.Command {
-	var (
-		genesis  string
-		template string
-	)
+	var template string
 
 	cmd := &cobra.Command{
 		Use:   "init [binary-path]",
@@ -69,7 +66,6 @@ func NewInitCommand(cfg *config.Config, logger *logger.Logger) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVar(&genesis, "genesis", "", "Path to genesis file")
 	cmd.Flags().StringVar(&template, "template", "", "Configuration template to apply")
 
 	return cmd
