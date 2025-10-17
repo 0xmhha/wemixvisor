@@ -39,12 +39,16 @@ echo "========================================="
 # 환경 설정
 export DAEMON_HOME=/tmp/wemixd_test
 export DAEMON_NAME=wemixd
-WEMIXVISOR="/Users/wm-it-22-00661/workspace/cosmovisor/wemixvisor/bin/wemixvisor"
+
+# 스크립트 위치 기반으로 프로젝트 루트 찾기
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+WEMIXVISOR="$PROJECT_ROOT/bin/wemixvisor"
 
 # 테스트 환경 준비
 echo "Setting up test environment..."
 rm -rf /tmp/wemixd_test
-/Users/wm-it-22-00661/workspace/cosmovisor/wemixvisor/test/setup_test_env.sh /tmp/wemixd_test > /dev/null 2>&1
+"$SCRIPT_DIR/setup_test_env.sh" /tmp/wemixd_test > /dev/null 2>&1
 
 echo ""
 echo "Running tests..."
