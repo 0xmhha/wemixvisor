@@ -50,7 +50,7 @@ func (h *CommandHandler) Execute(args []string) error {
 	switch parsed.Command {
 	case "init":
 		initCmd := NewInitCommand(h.config, h.logger)
-		return initCmd.Execute(parsed.NodeArgs)
+		return initCmd.RunE(initCmd, parsed.NodeArgs)
 	case "start":
 		return h.handleStart(parsed)
 	case "stop":

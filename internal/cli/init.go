@@ -8,7 +8,6 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/wemix/wemixvisor/internal/config"
 	"github.com/wemix/wemixvisor/pkg/logger"
-	"go.uber.org/zap"
 )
 
 // NewInitCommand creates the init command

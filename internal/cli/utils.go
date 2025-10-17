@@ -8,9 +8,6 @@ import (
 	"time"
 )
 
-// Version is the current version of wemixvisor
-const Version = "v0.4.0"
-
 // tailLogs displays the last n lines of a log file
 func tailLogs(logFile string, lines int) error {
 	file, err := os.Open(logFile)
