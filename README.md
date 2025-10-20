@@ -418,26 +418,23 @@ wemixvisor/
 ## Documentation
 
 ### Implementation Guides
-- [Phase 1: MVP](./docs/phase1-mvp.md) - Basic process management
-- [Phase 2: Core Features](./docs/phase2-core-features.md) - Backup and hooks
-- [Phase 3: Advanced Features](./docs/phase3-advanced-features.md) - Downloads, batch, WBFT
-- [Phase 4: Node Lifecycle](./docs/phase4-implementation-guide.md) - Node lifecycle management
-- [Phase 5: Config Management](./docs/phase5-config-management.md) - Configuration system
-- [Phase 6: Governance](./docs/phase6-governance-integration.md) - Governance monitoring
+- [Phase 4: Node Lifecycle](./docs/phase4-detailed-implementation.md) - Detailed implementation guide
 - [Phase 7: Advanced Features](./docs/phase7-advanced-features.md) - Metrics, API, optimization
-
-### User Guides
 - [Phase 7 User Guide](./docs/phase7-user-guide.md) - Using advanced features
+
+### Feature Documentation
+- [Metrics & Monitoring](./docs/metrics.md) - Metrics collection and Prometheus integration
+- [Alerting System](./docs/alerting.md) - Alert rules and notification channels
+- [Grafana Dashboards](./docs/grafana.md) - Dashboard setup and configuration
+- [Testing Guide](./docs/testing.md) - Testing strategy and coverage
 
 ### API References
 - [Governance API](./docs/governance-api.md) - Governance integration API
 - [Governance Overview](./docs/governance.md) - Governance system overview
 
-### Additional Resources
-- [Testing Guide](./docs/testing.md) - Testing strategy and coverage
-- [Cosmovisor Analysis](./docs/cosmovisor-analysis.md) - Original analysis
-- [Enhancement Specification](./docs/wemixvisor-enhancement-specification.md) - Overall roadmap
-- [Changes Log](./CHANGES.md) - Version history
+### Project Management
+- [Roadmap](./docs/ROADMAP.md) - Development roadmap and milestones
+- [Changes Log](./CHANGES.md) - Version history and release notes
 
 ## Development Status
 
@@ -451,11 +448,11 @@ wemixvisor/
   - 91.2% test coverage achieved
 - ✅ Phase 5: Configuration management system (v0.5.0) - Complete
 - ✅ Phase 6: Governance integration (v0.6.0) - Complete
-- ⚠️ Phase 7: Advanced features & optimization (v0.7.0) - In Progress
-  - ✅ Performance optimization (cache, pools, workers)
-  - ⚠️ API server (basic structure)
-  - ⚠️ Metrics collection (types defined)
-  - ⚠️ Alerting system (basic structure)
+- ✅ Phase 7: Advanced features & optimization (v0.7.0) - Complete
+  - Metrics collection and Prometheus exporter
+  - RESTful API server with WebSocket support
+  - Alerting system with multiple notification channels
+  - Performance profiling and optimization tools
 
 ## Contributing
 
