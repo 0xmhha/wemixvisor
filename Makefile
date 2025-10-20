@@ -241,7 +241,7 @@ clean: ## Remove build artifacts
 
 clean-all: clean ## Remove all generated files including caches
 	@echo "$(COLOR_YELLOW)Deep cleaning...$(COLOR_RESET)"
-	@rm -rf .cache .gomodcache
+	@rm -rf .cache
 	@$(GO_ENV) $(GO_CMD) clean -cache -testcache -modcache
 	@echo "$(COLOR_GREEN)✓ Deep clean completed$(COLOR_RESET)"
 
