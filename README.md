@@ -231,18 +231,49 @@ Wemixvisor automatically collects and provides metrics:
 
 ### Building
 
+All build artifacts are centralized in the `dist/` directory:
+
 ```bash
-# Build binary
+# Build binary (output: dist/bin/wemixvisor)
 make build
 
-# Run tests
-make test
+# Build for all platforms
+make build-all
 
+# Clean all build artifacts
+make clean
+
+# Deep clean (includes caches)
+make clean-all
+
+# View build information
+make info
+```
+
+**Build Output Structure:**
+```
+dist/
+├── bin/              # Binary executables
+├── coverage/         # Coverage reports
+├── reports/          # Test reports
+├── profiles/         # Performance profiles
+└── scripts-output/   # Script execution logs
+```
+
+### Code Quality
+
+```bash
 # Format code
 make fmt
 
 # Run linter
 make lint
+
+# Run go vet
+make vet
+
+# Run all checks
+make check
 ```
 
 ### Testing
@@ -412,7 +443,9 @@ wemixvisor/
 │   ├── logger/       # Logging utilities
 │   └── types/        # Common types
 ├── docs/             # Documentation
-└── test/             # Integration tests
+├── scripts/          # Utility scripts (tests, setup)
+├── test/             # Integration tests
+└── dist/             # Build artifacts (generated)
 ```
 
 ## Documentation

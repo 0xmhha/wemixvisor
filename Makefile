@@ -28,6 +28,7 @@ BIN_DIR := $(DIST_DIR)/bin
 COVERAGE_DIR := $(DIST_DIR)/coverage
 REPORTS_DIR := $(DIST_DIR)/reports
 PROFILES_DIR := $(DIST_DIR)/profiles
+SCRIPTS_OUTPUT_DIR := $(DIST_DIR)/scripts-output
 
 # Binary names
 BINARY_NAME := wemixvisor
@@ -230,8 +231,12 @@ release-notes: ## Generate release notes
 clean: ## Remove build artifacts
 	@echo "$(COLOR_YELLOW)Cleaning build artifacts...$(COLOR_RESET)"
 	@rm -rf $(DIST_DIR)
+	@rm -rf bin/
 	@rm -f $(BINARY_NAME)
-	@rm -f bin/$(BINARY_NAME)
+	@rm -f *.test
+	@rm -f *.out
+	@rm -f coverage*.out
+	@rm -f cli_coverage.out
 	@echo "$(COLOR_GREEN)✓ Clean completed$(COLOR_RESET)"
 
 clean-all: clean ## Remove all generated files including caches
@@ -280,6 +285,24 @@ deps-tidy: ## Tidy dependencies
 	@$(GO_ENV) $(GO_CMD) mod tidy
 	@echo "$(COLOR_GREEN)✓ Dependencies tidied$(COLOR_RESET)"
 
+##@ Scripts
+
+scripts-run-tests: ## Run test scripts
+	@echo "$(COLOR_GREEN)Running test scripts...$(COLOR_RESET)"
+	@mkdir -p $(SCRIPTS_OUTPUT_DIR)
+	@bash scripts/run_tests.sh 2>&1 | tee $(SCRIPTS_OUTPUT_DIR)/run_tests.log
+	@echo "$(COLOR_GREEN)✓ Test scripts completed$(COLOR_RESET)"
+
+scripts-setup-test: ## Setup test environment
+	@echo "$(COLOR_GREEN)Setting up test environment...$(COLOR_RESET)"
+	@mkdir -p $(SCRIPTS_OUTPUT_DIR)
+	@bash scripts/setup_test_env.sh ~/.wemixd_test 2>&1 | tee $(SCRIPTS_OUTPUT_DIR)/setup_test.log
+	@echo "$(COLOR_GREEN)✓ Test environment setup completed$(COLOR_RESET)"
+
+scripts-list: ## List available scripts
+	@echo "$(COLOR_BOLD)Available Scripts:$(COLOR_RESET)"
+	@ls -1 scripts/*.sh | sed 's|scripts/||' | sed 's|\.sh||'
+
 ##@ Information
 
 version: ## Show version information
@@ -299,11 +322,12 @@ info: ## Show build information
 	@echo "  Go Version:  $(shell $(GO_CMD) version | cut -d' ' -f3-)"
 	@echo ""
 	@echo "$(COLOR_BOLD)Directories$(COLOR_RESET)"
-	@echo "  Dist:        $(DIST_DIR)"
-	@echo "  Binary:      $(BIN_DIR)"
-	@echo "  Coverage:    $(COVERAGE_DIR)"
-	@echo "  Reports:     $(REPORTS_DIR)"
-	@echo "  Profiles:    $(PROFILES_DIR)"
+	@echo "  Dist:          $(DIST_DIR)"
+	@echo "  Binary:        $(BIN_DIR)"
+	@echo "  Coverage:      $(COVERAGE_DIR)"
+	@echo "  Reports:       $(REPORTS_DIR)"
+	@echo "  Profiles:      $(PROFILES_DIR)"
+	@echo "  Scripts Out:   $(SCRIPTS_OUTPUT_DIR)"
 
 tree: ## Show project directory tree
 	@if command -v tree > /dev/null; then \
