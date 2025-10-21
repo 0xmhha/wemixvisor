@@ -198,7 +198,9 @@ func (m *Manager) Start(args []string) error {
 	}()
 
 	// Start metrics collection (safe to call after mutex unlock)
-	m.metricsCollector.Start()
+	if m.metricsCollector != nil {
+		m.metricsCollector.Start()
+	}
 
 	m.logger.Info("node started successfully",
 		zap.Int("pid", pid),
@@ -265,7 +267,9 @@ func (m *Manager) Stop() error {
 
 	// Stop health monitoring and metrics collection
 	m.healthChecker.Stop()
-	m.metricsCollector.Stop()
+	if m.metricsCollector != nil {
+		m.metricsCollector.Stop()
+	}
 
 	m.stateMutex.Lock()
 	m.state = StateStopped

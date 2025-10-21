@@ -480,14 +480,16 @@ func TestCollectorConcurrency(t *testing.T) {
 				collector.SetUpgradePending(j)
 
 				time.Sleep(1 * time.Millisecond)
-=======
-	"testing"
-	"time"
+			}
+			done <- true
+		}()
+	}
 
-	"github.com/stretchr/testify/assert"
-	"github.com/wemix/wemixvisor/internal/config"
-	"github.com/wemix/wemixvisor/pkg/logger"
-)
+	// Wait for all goroutines
+	for i := 0; i < goroutines; i++ {
+		<-done
+	}
+}
 
 // Mock NodeInfoProvider for testing
 type mockNodeInfoProvider struct {
@@ -646,14 +648,13 @@ func TestMetricsCollector_GetMetrics_ThreadSafe(t *testing.T) {
 			for j := 0; j < 100; j++ {
 				metrics := collector.GetMetrics()
 				assert.True(t, metrics.Healthy)
->>>>>>> dev
 			}
 			done <- true
 		}()
 	}
 
 	// Wait for all goroutines
-	for i := 0; i < goroutines; i++ {
+	for i := 0; i < 10; i++ {
 		<-done
 	}
 
