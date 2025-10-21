@@ -15,6 +15,9 @@ import (
 
 // TestManager_MultipleStopCalls tests calling Stop multiple times
 func TestManager_MultipleStopCalls(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping functional test in short mode")
+	}
 	homeDir := t.TempDir()
 	binDir := filepath.Join(homeDir, "wemixvisor", "current", "bin")
 	require.NoError(t, os.MkdirAll(binDir, 0755))
@@ -51,6 +54,9 @@ func TestManager_MultipleStopCalls(t *testing.T) {
 
 // TestManager_RestartFromVariousStates tests restart from different states
 func TestManager_RestartFromVariousStates(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping functional test in short mode")
+	}
 	tests := []struct {
 		name         string
 		initialState NodeState
@@ -110,6 +116,9 @@ func TestManager_RestartFromVariousStates(t *testing.T) {
 
 // TestManager_RapidStartStop tests rapid start/stop cycles
 func TestManager_RapidStartStop(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping functional test in short mode")
+	}
 	homeDir := t.TempDir()
 	binDir := filepath.Join(homeDir, "wemixvisor", "current", "bin")
 	require.NoError(t, os.MkdirAll(binDir, 0755))
@@ -208,6 +217,9 @@ func TestManager_VeryLongArguments(t *testing.T) {
 
 // TestManager_RestartCounterBehavior tests restart counter behavior
 func TestManager_RestartCounterBehavior(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping functional test in short mode")
+	}
 	homeDir := t.TempDir()
 	binDir := filepath.Join(homeDir, "wemixvisor", "current", "bin")
 	require.NoError(t, os.MkdirAll(binDir, 0755))

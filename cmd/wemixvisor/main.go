@@ -64,6 +64,11 @@ func applyEnvVars(cfg *config.Config) {
 		cfg.RestartAfterUpgrade = false
 	}
 
+	// Phase 8: Upgrade automation settings
+	if val := os.Getenv("DAEMON_UPGRADE_ENABLED"); val == "false" {
+		cfg.UpgradeEnabled = false
+	}
+
 	// Process management
 	if val := os.Getenv("UNSAFE_SKIP_BACKUP"); val == "true" {
 		cfg.UnsafeSkipBackup = true

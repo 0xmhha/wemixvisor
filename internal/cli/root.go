@@ -40,5 +40,8 @@ It manages the lifecycle of the node binary, handling upgrades seamlessly.`,
 	cmd.AddCommand(NewMetricsCommand(cfg, logger))
 	cmd.AddCommand(NewProfileCommand(cfg, logger))
 
+	// Phase 8: Upgrade automation commands
+	cmd.AddCommand(NewUpgradeCommand(cfg, logger))
+
 	return cmd
 }

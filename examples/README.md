@@ -268,7 +268,7 @@ go tool pprof -http=:8081 /opt/wemixd/profiles/cpu_*.prof
 - [메트릭 문서](../docs/metrics.md)
 - [알림 설정 가이드](../docs/alerting.md)
 - [Grafana 대시보드 가이드](../docs/grafana.md)
-- [API 문서](../docs/api.md)
+- [Phase 7 기능 문서](../docs/phase7-advanced-features.md)
 
 ## 지원
 

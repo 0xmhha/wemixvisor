@@ -102,6 +102,10 @@ type Config struct {
 	// Governance settings
 	GovernanceEnabled bool `mapstructure:"governance_enabled"`
 
+	// Phase 8: Upgrade Automation settings
+	UpgradeEnabled      bool          `mapstructure:"upgrade_enabled"`
+	HeightPollInterval  time.Duration `mapstructure:"height_poll_interval"`
+
 	// CLI options
 	Daemon      bool `mapstructure:"daemon"`       // Run in background
 	JSONOutput  bool `mapstructure:"json_output"`  // Output in JSON format
@@ -186,7 +190,11 @@ func DefaultConfig() *Config {
 
 		GovernanceEnabled: false,
 
-		ConfigVersion: "0.7.0",
+		// Phase 8: Upgrade Automation defaults
+		UpgradeEnabled:     true,
+		HeightPollInterval: 5 * time.Second,
+
+		ConfigVersion: "0.8.0",
 	}
 }
 

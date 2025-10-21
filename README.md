@@ -45,6 +45,27 @@ Wemixvisor is inspired by Cosmos SDK's Cosmovisor and adapted specifically for W
 - Thread-safe concurrent operations
 - Comprehensive error handling and recovery
 
+### Phase 7: Advanced Monitoring and Management (v0.7.0) - Complete
+- Real-time metrics collection and Prometheus integration
+- WebSocket-based API server with real-time updates
+- Comprehensive alerting system with multi-channel notifications
+- Advanced performance profiling (CPU, memory, goroutine)
+- Resource optimization with caching and connection pooling
+- Structured logging with multiple output targets
+- RESTful API endpoints for programmatic control
+- Performance overhead < 1%
+
+### Phase 8: Upgrade Automation (v0.8.0) - Complete
+- Automatic blockchain height monitoring via RPC
+- Height-based upgrade orchestration and triggering
+- CLI commands for upgrade scheduling and management
+- File-based upgrade configuration (upgrade-info.json)
+- Automatic upgrade execution at configured heights
+- Rollback mechanism on upgrade failures
+- Real-time upgrade status reporting
+- Zero manual intervention required
+- Comprehensive integration testing
+
 ## Installation
 
 ### From Source
@@ -79,6 +100,49 @@ wemixvisor init /path/to/wemixd
 wemixvisor run start
 ```
 
+## Upgrade Management (Phase 8)
+
+### Schedule an Upgrade
+
+Schedule an upgrade to execute automatically at a specific block height:
+
+```bash
+# Basic upgrade scheduling
+wemixvisor upgrade schedule v1.2.0 1000000
+
+# With additional metadata
+wemixvisor upgrade schedule v1.2.0 1000000 \
+  --checksum abc123... \
+  --info "Major protocol upgrade"
+```
+
+### Check Upgrade Status
+
+View currently scheduled upgrade:
+
+```bash
+wemixvisor upgrade status
+```
+
+### Cancel Scheduled Upgrade
+
+Cancel a pending upgrade:
+
+```bash
+wemixvisor upgrade cancel
+
+# Skip confirmation
+wemixvisor upgrade cancel --force
+```
+
+### How It Works
+
+1. **Height Monitoring**: Wemixvisor continuously monitors blockchain height via RPC
+2. **Automatic Trigger**: When the blockchain reaches the scheduled height, upgrade executes automatically
+3. **Safe Execution**: Node stops gracefully → binary switches → node restarts with new binary
+4. **Rollback**: Automatic rollback to previous binary if upgrade fails
+5. **Zero Downtime**: Coordinated upgrades across validator network minimize downtime
+
 ## Configuration
 
 ### Environment Variables
@@ -103,6 +167,8 @@ wemixvisor run start
 | `DAEMON_MAX_RESTARTS` | `5` | Maximum auto-restart attempts |
 | `DAEMON_HEALTH_CHECK_INTERVAL` | `30s` | Health check interval |
 | `DAEMON_LOG_FILE` | - | Log file path for node output |
+| `DAEMON_UPGRADE_ENABLED` | `true` | Enable automatic upgrade monitoring (Phase 8) |
+| `DAEMON_HEIGHT_POLL_INTERVAL` | `5s` | Blockchain height polling interval (Phase 8) |
 
 ### Directory Structure
 
@@ -231,18 +297,49 @@ Wemixvisor automatically collects and provides metrics:
 
 ### Building
 
+All build artifacts are centralized in the `dist/` directory:
+
 ```bash
-# Build binary
+# Build binary (output: dist/bin/wemixvisor)
 make build
 
-# Run tests
-make test
+# Build for all platforms
+make build-all
 
+# Clean all build artifacts
+make clean
+
+# Deep clean (includes caches)
+make clean-all
+
+# View build information
+make info
+```
+
+**Build Output Structure:**
+```
+dist/
+├── bin/              # Binary executables
+├── coverage/         # Coverage reports
+├── reports/          # Test reports
+├── profiles/         # Performance profiles
+└── scripts-output/   # Script execution logs
+```
+
+### Code Quality
+
+```bash
 # Format code
 make fmt
 
 # Run linter
 make lint
+
+# Run go vet
+make vet
+
+# Run all checks
+make check
 ```
 
 ### Testing
@@ -412,32 +509,31 @@ wemixvisor/
 │   ├── logger/       # Logging utilities
 │   └── types/        # Common types
 ├── docs/             # Documentation
-└── test/             # Integration tests
+├── scripts/          # Utility scripts (tests, setup)
+├── test/             # Integration tests
+└── dist/             # Build artifacts (generated)
 ```
 
 ## Documentation
 
 ### Implementation Guides
-- [Phase 1: MVP](./docs/phase1-mvp.md) - Basic process management
-- [Phase 2: Core Features](./docs/phase2-core-features.md) - Backup and hooks
-- [Phase 3: Advanced Features](./docs/phase3-advanced-features.md) - Downloads, batch, WBFT
-- [Phase 4: Node Lifecycle](./docs/phase4-implementation-guide.md) - Node lifecycle management
-- [Phase 5: Config Management](./docs/phase5-config-management.md) - Configuration system
-- [Phase 6: Governance](./docs/phase6-governance-integration.md) - Governance monitoring
+- [Phase 4: Node Lifecycle](./docs/phase4-detailed-implementation.md) - Detailed implementation guide
 - [Phase 7: Advanced Features](./docs/phase7-advanced-features.md) - Metrics, API, optimization
-
-### User Guides
 - [Phase 7 User Guide](./docs/phase7-user-guide.md) - Using advanced features
+
+### Feature Documentation
+- [Metrics & Monitoring](./docs/metrics.md) - Metrics collection and Prometheus integration
+- [Alerting System](./docs/alerting.md) - Alert rules and notification channels
+- [Grafana Dashboards](./docs/grafana.md) - Dashboard setup and configuration
+- [Testing Guide](./docs/testing.md) - Testing strategy and coverage
 
 ### API References
 - [Governance API](./docs/governance-api.md) - Governance integration API
 - [Governance Overview](./docs/governance.md) - Governance system overview
 
-### Additional Resources
-- [Testing Guide](./docs/testing.md) - Testing strategy and coverage
-- [Cosmovisor Analysis](./docs/cosmovisor-analysis.md) - Original analysis
-- [Enhancement Specification](./docs/wemixvisor-enhancement-specification.md) - Overall roadmap
-- [Changes Log](./CHANGES.md) - Version history
+### Project Management
+- [Roadmap](./docs/ROADMAP.md) - Development roadmap and milestones
+- [Changes Log](./CHANGES.md) - Version history and release notes
 
 ## Development Status
 
@@ -451,11 +547,17 @@ wemixvisor/
   - 91.2% test coverage achieved
 - ✅ Phase 5: Configuration management system (v0.5.0) - Complete
 - ✅ Phase 6: Governance integration (v0.6.0) - Complete
-- ⚠️ Phase 7: Advanced features & optimization (v0.7.0) - In Progress
-  - ✅ Performance optimization (cache, pools, workers)
-  - ⚠️ API server (basic structure)
-  - ⚠️ Metrics collection (types defined)
-  - ⚠️ Alerting system (basic structure)
+- ✅ Phase 7: Advanced features & optimization (v0.7.0) - Complete
+  - Metrics collection and Prometheus exporter
+  - RESTful API server with WebSocket support
+  - Alerting system with multiple notification channels
+  - Performance profiling and optimization tools
+- ✅ Phase 8: Upgrade Automation (v0.8.0) - Complete
+  - Automatic blockchain height monitoring
+  - Height-based upgrade orchestration
+  - CLI commands for upgrade management
+  - Zero manual intervention upgrades
+  - 78-100% test coverage achieved
 
 ## Contributing
 

@@ -69,6 +69,9 @@ func TestManager_Start_NoBinary(t *testing.T) {
 }
 
 func TestManager_Start_Success(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping functional test in short mode")
+	}
 	homeDir := t.TempDir()
 	binDir := filepath.Join(homeDir, "wemixvisor", "current", "bin")
 	require.NoError(t, os.MkdirAll(binDir, 0755))
@@ -119,6 +122,9 @@ func TestManager_Stop_NotRunning(t *testing.T) {
 }
 
 func TestManager_Restart(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping functional test in short mode")
+	}
 	homeDir := t.TempDir()
 	binDir := filepath.Join(homeDir, "wemixvisor", "current", "bin")
 	require.NoError(t, os.MkdirAll(binDir, 0755))
@@ -198,6 +204,9 @@ func TestManager_AutoRestart(t *testing.T) {
 }
 
 func TestManager_GetStatus(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping functional test in short mode")
+	}
 	homeDir := t.TempDir()
 	binDir := filepath.Join(homeDir, "wemixvisor", "current", "bin")
 	require.NoError(t, os.MkdirAll(binDir, 0755))
@@ -274,6 +283,9 @@ func TestManager_BuildEnvironment(t *testing.T) {
 }
 
 func TestManager_IsHealthy(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping functional test in short mode")
+	}
 	homeDir := t.TempDir()
 	binDir := filepath.Join(homeDir, "wemixvisor", "current", "bin")
 	require.NoError(t, os.MkdirAll(binDir, 0755))
@@ -309,6 +321,9 @@ func TestManager_IsHealthy(t *testing.T) {
 }
 
 func TestManager_GetPID(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping functional test in short mode")
+	}
 	homeDir := t.TempDir()
 	binDir := filepath.Join(homeDir, "wemixvisor", "current", "bin")
 	require.NoError(t, os.MkdirAll(binDir, 0755))
@@ -345,6 +360,9 @@ func TestManager_GetPID(t *testing.T) {
 }
 
 func TestManager_GetVersion(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping functional test in short mode")
+	}
 	homeDir := t.TempDir()
 	binDir := filepath.Join(homeDir, "wemixvisor", "current", "bin")
 	require.NoError(t, os.MkdirAll(binDir, 0755))

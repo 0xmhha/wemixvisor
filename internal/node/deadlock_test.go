@@ -115,9 +115,10 @@ func TestConcurrentAccess(t *testing.T) {
 // TestMetricsCollectorStart tests that metrics collector can start without deadlock
 func TestMetricsCollectorStart(t *testing.T) {
 	cfg := &config.Config{
-		Home:            t.TempDir(),
-		Name:            "test",
-		MetricsInterval: 100 * time.Millisecond,
+		Home:                      t.TempDir(),
+		Name:                      "test",
+		MetricsEnabled:            true,
+		MetricsCollectionInterval: 100 * time.Millisecond,
 	}
 
 	logger := logger.NewTestLogger()
