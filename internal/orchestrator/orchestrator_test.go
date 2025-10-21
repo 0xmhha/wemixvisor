@@ -20,14 +20,14 @@ import (
 
 // MockNodeManager is a mock implementation of NodeManager for testing.
 type MockNodeManager struct {
-	mu            sync.Mutex
-	state         node.NodeState
-	startErr      error
-	stopErr       error
-	startCalls    int
-	stopCalls     int
-	startArgs     [][]string
-	status        *node.Status
+	mu         sync.Mutex
+	state      node.NodeState
+	startErr   error
+	stopErr    error
+	startCalls int
+	stopCalls  int
+	startArgs  [][]string
+	status     *node.Status
 }
 
 // NewMockNodeManager creates a new MockNodeManager with default values.
@@ -141,8 +141,8 @@ type MockConfigManager struct {
 func NewMockConfigManager() *MockConfigManager {
 	return &MockConfigManager{
 		config: &config.Config{
-			Home:        "/tmp/wemixvisor-test",
-			Name:        "wemix",
+			Home:         "/tmp/wemixvisor-test",
+			Name:         "wemix",
 			PollInterval: 1 * time.Second,
 		},
 	}
@@ -164,10 +164,10 @@ func (m *MockConfigManager) SetConfig(cfg *config.Config) {
 
 // MockUpgradeWatcher is a mock implementation of UpgradeWatcher for testing.
 type MockUpgradeWatcher struct {
-	mu           sync.Mutex
-	upgrade      *types.UpgradeInfo
-	needsUpdate  bool
-	clearCalls   int
+	mu          sync.Mutex
+	upgrade     *types.UpgradeInfo
+	needsUpdate bool
+	clearCalls  int
 }
 
 // NewMockUpgradeWatcher creates a new MockUpgradeWatcher.

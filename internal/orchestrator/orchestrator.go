@@ -32,25 +32,25 @@ import (
 // Thread-safety: All public methods are thread-safe and can be called concurrently.
 type UpgradeOrchestrator struct {
 	// Core dependencies (injected, immutable)
-	nodeManager     NodeManager
-	configManager   ConfigManager
-	heightMonitor   *height.HeightMonitor
-	upgradeWatcher  UpgradeWatcher
-	logger          *logger.Logger
+	nodeManager    NodeManager
+	configManager  ConfigManager
+	heightMonitor  *height.HeightMonitor
+	upgradeWatcher UpgradeWatcher
+	logger         *logger.Logger
 
 	// State (protected by mu)
-	pendingUpgrade  *types.UpgradeInfo
-	upgrading       bool
-	started         bool
-	mu              sync.RWMutex
+	pendingUpgrade *types.UpgradeInfo
+	upgrading      bool
+	started        bool
+	mu             sync.RWMutex
 
 	// Lifecycle management
-	ctx             context.Context
-	cancel          context.CancelFunc
-	wg              sync.WaitGroup
+	ctx    context.Context
+	cancel context.CancelFunc
+	wg     sync.WaitGroup
 
 	// Channels for coordination
-	heightCh        <-chan int64  // Subscription to height updates
+	heightCh <-chan int64 // Subscription to height updates
 }
 
 // UpgradeStatus represents the current upgrade state.
