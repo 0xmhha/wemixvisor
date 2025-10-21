@@ -16,6 +16,9 @@ import (
 // These tests verify that all implemented features work correctly
 
 func TestPhase2Phase3_Functional(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping functional tests in short mode")
+	}
 	t.Run("BasicLifecycle", testBasicLifecycle)
 	t.Run("GracefulShutdown", testGracefulShutdownFunctional)
 	t.Run("HealthChecks", testHealthChecksFunctional)
@@ -306,6 +309,9 @@ func TestAutoRestartFunctional(t *testing.T) {
 
 // TestConcurrentAccessFunctional tests thread safety
 func TestConcurrentAccessFunctional(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping functional test in short mode")
+	}
 	homeDir := t.TempDir()
 	binDir := filepath.Join(homeDir, "wemixvisor", "current", "bin")
 	require.NoError(t, os.MkdirAll(binDir, 0755))
@@ -355,6 +361,9 @@ func TestConcurrentAccessFunctional(t *testing.T) {
 
 // TestEnvironmentVariables tests environment variable handling
 func TestEnvironmentVariables(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping functional test in short mode")
+	}
 	homeDir := t.TempDir()
 	binDir := filepath.Join(homeDir, "wemixvisor", "current", "bin")
 	require.NoError(t, os.MkdirAll(binDir, 0755))
@@ -408,6 +417,9 @@ func TestEnvironmentVariables(t *testing.T) {
 
 // TestStatusInformation tests status reporting
 func TestStatusInformation(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping functional test in short mode")
+	}
 	homeDir := t.TempDir()
 	binDir := filepath.Join(homeDir, "wemixvisor", "current", "bin")
 	require.NoError(t, os.MkdirAll(binDir, 0755))
@@ -450,6 +462,9 @@ func TestStatusInformation(t *testing.T) {
 
 // TestErrorHandling tests error conditions
 func TestErrorHandling(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping functional test in short mode")
+	}
 	homeDir := t.TempDir()
 
 	cfg := &config.Config{

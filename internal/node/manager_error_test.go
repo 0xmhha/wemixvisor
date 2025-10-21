@@ -123,6 +123,9 @@ func TestManager_Stop_SignalError(t *testing.T) {
 
 // TestManager_Restart_MaxRestartsExceeded tests max restart limit
 func TestManager_Restart_MaxRestartsExceeded(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping long-running test in short mode")
+	}
 	homeDir := t.TempDir()
 	binDir := filepath.Join(homeDir, "wemixvisor", "current", "bin")
 	require.NoError(t, os.MkdirAll(binDir, 0755))
@@ -159,6 +162,9 @@ func TestManager_Restart_MaxRestartsExceeded(t *testing.T) {
 
 // TestManager_Close tests the Close method
 func TestManager_Close(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping functional test in short mode")
+	}
 	homeDir := t.TempDir()
 	binDir := filepath.Join(homeDir, "wemixvisor", "current", "bin")
 	require.NoError(t, os.MkdirAll(binDir, 0755))

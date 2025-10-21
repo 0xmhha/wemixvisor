@@ -4,116 +4,118 @@ import (
 	"testing"
 	"time"
 
-	"github.com/wemix/wemixvisor/internal/config"
 	"github.com/wemix/wemixvisor/pkg/logger"
 )
 
-// BenchmarkMetricsCollector_CollectMetrics benchmarks the metrics collection performance
-func BenchmarkMetricsCollector_CollectMetrics(b *testing.B) {
-	cfg := &config.Config{
-		MetricsInterval: 10 * time.Second,
+// BenchmarkCollector_Collect benchmarks the metrics collection performance
+func BenchmarkCollector_Collect(b *testing.B) {
+	config := &CollectorConfig{
+		Enabled:             true,
+		CollectionInterval:  10 * time.Second,
+		EnableSystemMetrics: true,
+		EnableAppMetrics:    true,
+		EnableGovMetrics:    true,
+		EnablePerfMetrics:   true,
 	}
-	logger, _ := logger.New(true, false, "")
-	nodeInfo := &mockNodeInfoProvider{
-		uptime:       2 * time.Hour,
-		restartCount: 5,
-		healthy:      true,
-		pid:          1234,
-	}
-
-	collector := NewMetricsCollector(cfg, logger, nodeInfo)
+	logger := logger.NewTestLogger()
+	collector := NewCollector(config, logger)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		collector.collectMetrics()
+		collector.collect()
 	}
 }
 
-// BenchmarkMetricsCollector_GetMetrics benchmarks the metrics retrieval performance
-func BenchmarkMetricsCollector_GetMetrics(b *testing.B) {
-	cfg := &config.Config{}
-	logger, _ := logger.New(true, false, "")
-	nodeInfo := &mockNodeInfoProvider{
-		uptime:       2 * time.Hour,
-		restartCount: 5,
-		healthy:      true,
-		pid:          1234,
+// BenchmarkCollector_GetSnapshot benchmarks the metrics retrieval performance
+func BenchmarkCollector_GetSnapshot(b *testing.B) {
+	config := &CollectorConfig{
+		Enabled:             true,
+		CollectionInterval:  10 * time.Second,
+		EnableSystemMetrics: true,
+		EnableAppMetrics:    true,
+		EnableGovMetrics:    true,
+		EnablePerfMetrics:   true,
 	}
+	logger := logger.NewTestLogger()
+	collector := NewCollector(config, logger)
 
-	collector := NewMetricsCollector(cfg, logger, nodeInfo)
-	collector.collectMetrics() // Initialize metrics
+	// Initialize metrics
+	collector.collect()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_ = collector.GetMetrics()
+		_ = collector.GetSnapshot()
 	}
 }
 
-// BenchmarkMetricsCollector_ExportJSON benchmarks JSON export performance
-func BenchmarkMetricsCollector_ExportJSON(b *testing.B) {
-	cfg := &config.Config{}
-	logger, _ := logger.New(true, false, "")
-	nodeInfo := &mockNodeInfoProvider{
-		uptime:       2 * time.Hour,
-		restartCount: 5,
-		healthy:      true,
-		pid:          1234,
+// BenchmarkCollector_PrometheusGather benchmarks Prometheus registry gathering
+func BenchmarkCollector_PrometheusGather(b *testing.B) {
+	config := &CollectorConfig{
+		Enabled:             true,
+		CollectionInterval:  10 * time.Second,
+		EnableSystemMetrics: true,
+		EnableAppMetrics:    true,
+		EnableGovMetrics:    true,
+		EnablePerfMetrics:   true,
 	}
+	logger := logger.NewTestLogger()
+	collector := NewCollector(config, logger)
 
-	collector := NewMetricsCollector(cfg, logger, nodeInfo)
-	collector.collectMetrics() // Initialize metrics
+	// Initialize metrics
+	collector.collect()
+	registry := collector.GetRegistry()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, err := collector.ExportMetrics("json")
+		_, err := registry.Gather()
 		if err != nil {
 			b.Fatal(err)
 		}
 	}
 }
 
-// BenchmarkMetricsCollector_ExportPrometheus benchmarks Prometheus export performance
-func BenchmarkMetricsCollector_ExportPrometheus(b *testing.B) {
-	cfg := &config.Config{}
-	logger, _ := logger.New(true, false, "")
-	nodeInfo := &mockNodeInfoProvider{
-		uptime:       2 * time.Hour,
-		restartCount: 5,
-		healthy:      true,
-		pid:          1234,
+// BenchmarkCollector_MetricUpdates benchmarks metric update operations
+func BenchmarkCollector_MetricUpdates(b *testing.B) {
+	config := &CollectorConfig{
+		Enabled:             true,
+		CollectionInterval:  10 * time.Second,
+		EnableSystemMetrics: true,
+		EnableAppMetrics:    true,
+		EnableGovMetrics:    true,
+		EnablePerfMetrics:   true,
 	}
-
-	collector := NewMetricsCollector(cfg, logger, nodeInfo)
-	collector.collectMetrics() // Initialize metrics
+	logger := logger.NewTestLogger()
+	collector := NewCollector(config, logger)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, err := collector.ExportMetrics("prometheus")
-		if err != nil {
-			b.Fatal(err)
-		}
+		collector.IncrementUpgradeTotal()
+		collector.SetUpgradePending(i % 10)
+		collector.ObserveRPCLatency(float64(i % 100))
+		collector.ObserveAPILatency(float64(i % 50))
 	}
 }
 
-// BenchmarkMetricsCollector_ConcurrentAccess benchmarks concurrent access to metrics
-func BenchmarkMetricsCollector_ConcurrentAccess(b *testing.B) {
-	cfg := &config.Config{}
-	logger, _ := logger.New(true, false, "")
-	nodeInfo := &mockNodeInfoProvider{
-		uptime:       2 * time.Hour,
-		restartCount: 5,
-		healthy:      true,
-		pid:          1234,
+// BenchmarkCollector_ConcurrentAccess benchmarks concurrent access to metrics
+func BenchmarkCollector_ConcurrentAccess(b *testing.B) {
+	config := &CollectorConfig{
+		Enabled:             true,
+		CollectionInterval:  10 * time.Second,
+		EnableSystemMetrics: true,
+		EnableAppMetrics:    true,
+		EnableGovMetrics:    true,
+		EnablePerfMetrics:   true,
 	}
+	logger := logger.NewTestLogger()
+	collector := NewCollector(config, logger)
 
-	collector := NewMetricsCollector(cfg, logger, nodeInfo)
-	collector.collectMetrics() // Initialize metrics
+	// Initialize metrics
+	collector.collect()
 
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
-			_ = collector.GetMetrics()
+			_ = collector.GetSnapshot()
 		}
 	})
 }
-
