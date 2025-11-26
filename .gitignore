@@ -62,6 +62,14 @@ debug.test
 logs/
 *.log.*
 
+# Test log output files
+pkg/logger/iso8601
+pkg/logger/kitchen
+pkg/logger/rfc3339
+pkg/logger/rfc3339nano
+pkg/logger/unknown
+internal/performance/iso8601
+
 # Temporary files
 tmp/
 temp/
