@@ -12,15 +12,26 @@ import (
 	"time"
 
 	"go.uber.org/zap"
+
 	"github.com/wemix/wemixvisor/internal/config"
 	"github.com/wemix/wemixvisor/internal/metrics"
 	"github.com/wemix/wemixvisor/internal/monitor"
 	"github.com/wemix/wemixvisor/pkg/logger"
 )
 
+// Default values for manager configuration
+const (
+	DefaultMaxRestarts        = 5
+	DefaultShutdownGrace      = 30 * time.Second
+	DefaultRestartDelay       = 2 * time.Second
+	DefaultAutoRestartDelay   = 5 * time.Second
+	DefaultVersionTimeout     = 5 * time.Second
+	DefaultProcessExitWait    = 100 * time.Millisecond
+	ErrorChannelBufferSize    = 10
+)
+
 // Manager handles the lifecycle of a node process
 type Manager struct {
-	// Core components
 	config *config.Config
 	logger *logger.Logger
 
@@ -53,60 +64,62 @@ type Manager struct {
 }
 
 // NewManager creates a new node manager
-func NewManager(cfg *config.Config, logger *logger.Logger) *Manager {
+func NewManager(cfg *config.Config, log *logger.Logger) *Manager {
 	ctx, cancel := context.WithCancel(context.Background())
 
-	maxRestarts := 5
+	maxRestarts := DefaultMaxRestarts
 	if cfg.MaxRestarts > 0 {
 		maxRestarts = cfg.MaxRestarts
 	}
 
-	// Create health checker
-	healthChecker := monitor.NewHealthChecker(cfg, logger)
+	healthChecker := monitor.NewHealthChecker(cfg, log)
 
 	manager := &Manager{
 		config:        cfg,
-		logger:        logger,
+		logger:        log,
 		state:         StateStopped,
 		nodeOptions:   make(map[string]string),
 		maxRestarts:   maxRestarts,
 		healthChecker: healthChecker,
 		stopCh:        make(chan struct{}),
 		restartCh:     make(chan struct{}),
-		errorCh:       make(chan error, 10),
+		errorCh:       make(chan error, ErrorChannelBufferSize),
 		doneCh:        make(chan struct{}),
 		ctx:           ctx,
 		cancel:        cancel,
 	}
 
-	// Create metrics collector
-	if cfg.MetricsEnabled {
-		collectorConfig := &metrics.CollectorConfig{
-			Enabled:             true,
-			CollectionInterval:  cfg.MetricsCollectionInterval,
-			EnableSystemMetrics: cfg.EnableSystemMetrics,
-			EnableAppMetrics:    cfg.EnableAppMetrics,
-			EnableGovMetrics:    cfg.EnableGovMetrics,
-			EnablePerfMetrics:   cfg.EnablePerfMetrics,
-			PrometheusPort:      cfg.MetricsPort,
-			PrometheusPath:      cfg.MetricsPath,
-		}
-		manager.metricsCollector = metrics.NewCollector(collectorConfig, logger)
-
-		// Set callbacks for node-specific metrics
-		manager.metricsCollector.SetNodeHeightCallback(func() (int64, error) {
-			// TODO: implement actual height fetching
-			return 0, nil
-		})
-	}
+	manager.initMetricsCollector(cfg, log)
 
 	return manager
+}
+
+// initMetricsCollector initializes the metrics collector if enabled
+func (m *Manager) initMetricsCollector(cfg *config.Config, log *logger.Logger) {
+	if !cfg.MetricsEnabled {
+		return
+	}
+
+	collectorConfig := &metrics.CollectorConfig{
+		Enabled:             true,
+		CollectionInterval:  cfg.MetricsCollectionInterval,
+		EnableSystemMetrics: cfg.EnableSystemMetrics,
+		EnableAppMetrics:    cfg.EnableAppMetrics,
+		EnableGovMetrics:    cfg.EnableGovMetrics,
+		EnablePerfMetrics:   cfg.EnablePerfMetrics,
+		PrometheusPort:      cfg.MetricsPort,
+		PrometheusPath:      cfg.MetricsPath,
+	}
+	m.metricsCollector = metrics.NewCollector(collectorConfig, log)
+
+	m.metricsCollector.SetNodeHeightCallback(func() (int64, error) {
+		return 0, nil
+	})
 }
 
 // Start starts the node with the given arguments
 func (m *Manager) Start(args []string) error {
 	m.stateMutex.Lock()
-	// Note: We manually unlock the mutex to prevent deadlock with metrics collector
 
 	if m.state != StateStopped {
 		m.stateMutex.Unlock()
@@ -116,36 +129,70 @@ func (m *Manager) Start(args []string) error {
 	m.state = StateStarting
 	m.nodeArgs = args
 
-	// Build command
 	cmdPath := m.config.CurrentBin()
 	if cmdPath == "" {
 		m.state = StateError
 		m.stateMutex.Unlock()
-		return fmt.Errorf("no binary found")
+		return fmt.Errorf("no binary path configured")
 	}
 
-	// Ensure binary exists and is executable
 	if _, err := os.Stat(cmdPath); err != nil {
 		m.state = StateError
 		m.stateMutex.Unlock()
-		return fmt.Errorf("binary not found: %w", err)
+		return fmt.Errorf("binary not found at %s: %w", cmdPath, err)
 	}
 
 	m.logger.Info("starting node",
 		zap.String("binary", cmdPath),
 		zap.Strings("args", args))
 
-	cmd := exec.CommandContext(m.ctx, cmdPath, args...)
+	if err := m.startProcess(cmdPath, args); err != nil {
+		m.state = StateError
+		m.stateMutex.Unlock()
+		return err
+	}
 
-	// Set environment variables
+	m.stateMutex.Unlock()
+
+	m.startMonitoring()
+
+	m.logger.Info("node started successfully",
+		zap.Int("pid", m.process.Pid),
+		zap.Strings("args", args))
+
+	return nil
+}
+
+// startProcess creates and starts the node process
+func (m *Manager) startProcess(cmdPath string, args []string) error {
+	cmd := exec.CommandContext(m.ctx, cmdPath, args...)
 	cmd.Env = m.buildEnvironment()
 
-	// Set working directory to home
 	if m.config.Home != "" {
 		cmd.Dir = m.config.Home
 	}
 
-	// Setup stdout/stderr
+	m.setupProcessOutput(cmd)
+
+	cmd.SysProcAttr = &syscall.SysProcAttr{
+		Setpgid: true,
+		Pgid:    0,
+	}
+
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("failed to start process: %w", err)
+	}
+
+	m.cmd = cmd
+	m.process = cmd.Process
+	m.startTime = time.Now()
+	m.state = StateRunning
+
+	return nil
+}
+
+// setupProcessOutput configures stdout/stderr for the process
+func (m *Manager) setupProcessOutput(cmd *exec.Cmd) {
 	logFile := m.getLogFile()
 	if logFile != nil {
 		cmd.Stdout = logFile
@@ -154,59 +201,33 @@ func (m *Manager) Start(args []string) error {
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 	}
+}
 
-	// Set process group for clean shutdown and zombie prevention
-	cmd.SysProcAttr = &syscall.SysProcAttr{
-		Setpgid: true,
-		Pgid:    0, // Create new process group
-	}
-
-	// Start the process
-	if err := cmd.Start(); err != nil {
-		m.state = StateError
-		m.stateMutex.Unlock()
-		return fmt.Errorf("failed to start node: %w", err)
-	}
-
-	m.cmd = cmd
-	m.process = cmd.Process
-	m.startTime = time.Now()
-	m.state = StateRunning
-	pid := m.process.Pid
-
-	// Unlock mutex before starting other components to prevent deadlock
-	m.stateMutex.Unlock()
-
-	// Start monitoring goroutine
+// startMonitoring starts all monitoring goroutines
+func (m *Manager) startMonitoring() {
 	go m.monitor()
+	go m.monitorHealth()
 
-	// Start health monitoring
-	go func() {
-		healthStatusCh := m.healthChecker.Start()
-		for {
-			select {
-			case status := <-healthStatusCh:
-				if !status.Healthy {
-					m.logger.Warn("health check failed",
-						zap.Bool("healthy", status.Healthy),
-						zap.Any("checks", status.Checks))
-				}
-			case <-m.ctx.Done():
-				return
-			}
-		}
-	}()
-
-	// Start metrics collection (safe to call after mutex unlock)
 	if m.metricsCollector != nil {
 		m.metricsCollector.Start()
 	}
+}
 
-	m.logger.Info("node started successfully",
-		zap.Int("pid", pid),
-		zap.Strings("args", args))
-
-	return nil
+// monitorHealth monitors health status updates
+func (m *Manager) monitorHealth() {
+	healthStatusCh := m.healthChecker.Start()
+	for {
+		select {
+		case status := <-healthStatusCh:
+			if !status.Healthy {
+				m.logger.Warn("health check failed",
+					zap.Bool("healthy", status.Healthy),
+					zap.Any("checks", status.Checks))
+			}
+		case <-m.ctx.Done():
+			return
+		}
+	}
 }
 
 // Stop stops the node gracefully
@@ -225,26 +246,38 @@ func (m *Manager) Stop() error {
 
 	m.logger.Info("stopping node", zap.Int("pid", pid))
 
-	// Send SIGTERM to the entire process group for graceful shutdown
+	if err := m.sendStopSignal(pid, process); err != nil {
+		return err
+	}
+
+	m.waitForShutdown(pid, process)
+	m.stopMonitoring()
+	m.cleanupState()
+
+	return nil
+}
+
+// sendStopSignal sends SIGTERM to the process group
+func (m *Manager) sendStopSignal(pid int, process *os.Process) error {
 	if err := syscall.Kill(-pid, syscall.SIGTERM); err != nil {
 		m.logger.Error("failed to send SIGTERM to process group", zap.Error(err))
-		// Fallback to individual process
 		if err := process.Signal(syscall.SIGTERM); err != nil {
 			m.logger.Error("failed to send SIGTERM to process", zap.Error(err))
-			// Force kill as last resort
 			if err := syscall.Kill(-pid, syscall.SIGKILL); err != nil {
 				return fmt.Errorf("failed to kill process: %w", err)
 			}
 		}
 	}
+	return nil
+}
 
-	shutdownGrace := 30 * time.Second
+// waitForShutdown waits for the process to exit gracefully or forces termination
+func (m *Manager) waitForShutdown(pid int, process *os.Process) {
+	shutdownGrace := DefaultShutdownGrace
 	if m.config.ShutdownGrace > 0 {
 		shutdownGrace = m.config.ShutdownGrace
 	}
 
-	// Wait for the monitor goroutine to detect process exit
-	// or timeout if it takes too long
 	timer := time.NewTimer(shutdownGrace)
 	defer timer.Stop()
 
@@ -253,24 +286,31 @@ func (m *Manager) Stop() error {
 		m.logger.Info("node stopped gracefully")
 	case <-timer.C:
 		m.logger.Warn("grace period exceeded, forcing shutdown")
-		// Kill the entire process group
-		if err := syscall.Kill(-pid, syscall.SIGKILL); err != nil {
-			m.logger.Error("failed to kill process group", zap.Error(err))
-			// Fallback to individual process
-			if err := process.Kill(); err != nil {
-				m.logger.Error("failed to kill process", zap.Error(err))
-			}
-		}
-		// Give it a moment to die
-		time.Sleep(100 * time.Millisecond)
+		m.forceKill(pid, process)
 	}
+}
 
-	// Stop health monitoring and metrics collection
+// forceKill forcefully terminates the process
+func (m *Manager) forceKill(pid int, process *os.Process) {
+	if err := syscall.Kill(-pid, syscall.SIGKILL); err != nil {
+		m.logger.Error("failed to kill process group", zap.Error(err))
+		if err := process.Kill(); err != nil {
+			m.logger.Error("failed to kill process", zap.Error(err))
+		}
+	}
+	time.Sleep(DefaultProcessExitWait)
+}
+
+// stopMonitoring stops health and metrics monitoring
+func (m *Manager) stopMonitoring() {
 	m.healthChecker.Stop()
 	if m.metricsCollector != nil {
 		m.metricsCollector.Stop()
 	}
+}
 
+// cleanupState resets manager state after stop
+func (m *Manager) cleanupState() {
 	m.stateMutex.Lock()
 	m.state = StateStopped
 	m.cmd = nil
@@ -280,51 +320,48 @@ func (m *Manager) Stop() error {
 		m.doneCh = nil
 	}
 	m.stateMutex.Unlock()
-
-	return nil
 }
 
 // Restart restarts the node with the same arguments
 func (m *Manager) Restart() error {
 	m.logger.Info("restarting node")
 
-	// Save current args
 	args := m.nodeArgs
 
-	// Stop the node if it's running
 	currentState := m.GetState()
 	if currentState == StateRunning {
 		if err := m.Stop(); err != nil {
-			return fmt.Errorf("failed to stop node: %w", err)
+			return fmt.Errorf("failed to stop node for restart: %w", err)
 		}
 	} else if currentState != StateStopped {
-		// If in error or other state, reset to stopped
-		m.stateMutex.Lock()
-		m.state = StateStopped
-		m.cmd = nil
-		m.process = nil
-		m.stateMutex.Unlock()
+		m.resetState()
 	}
 
-	// Wait briefly before restart
-	time.Sleep(2 * time.Second)
+	time.Sleep(DefaultRestartDelay)
 
-	// Reset done channel
 	m.stateMutex.Lock()
 	if m.doneCh == nil {
 		m.doneCh = make(chan struct{})
 	}
 	m.stateMutex.Unlock()
 
-	// Start with same args
 	if err := m.Start(args); err != nil {
-		return fmt.Errorf("failed to start node: %w", err)
+		return fmt.Errorf("failed to start node after restart: %w", err)
 	}
 
 	m.restartCount++
 	m.logger.Info("node restarted successfully", zap.Int("restart_count", m.restartCount))
 
 	return nil
+}
+
+// resetState resets manager state to stopped
+func (m *Manager) resetState() {
+	m.stateMutex.Lock()
+	m.state = StateStopped
+	m.cmd = nil
+	m.process = nil
+	m.stateMutex.Unlock()
 }
 
 // GetState returns the current node state
@@ -353,31 +390,35 @@ func (m *Manager) GetStatus() *Status {
 		status.Uptime = time.Since(m.startTime)
 	}
 
-	// Try to get version from binary (only if running)
 	if status.Binary != "" && m.state == StateRunning {
 		status.Version = m.GetVersion()
 	}
 
-	// Get health status if node is running
 	if m.state == StateRunning && m.healthChecker != nil {
-		healthStatus := m.healthChecker.GetStatus()
-		status.Health = &HealthStatus{
-			Healthy:   healthStatus.Healthy,
-			Timestamp: healthStatus.Timestamp,
-			Checks:    make(map[string]CheckResult),
-		}
-
-		// Convert monitor.CheckResult to node.CheckResult
-		for name, check := range healthStatus.Checks {
-			status.Health.Checks[name] = CheckResult{
-				Name:    check.Name,
-				Healthy: check.Healthy,
-				Error:   check.Error,
-			}
-		}
+		status.Health = m.buildHealthStatus()
 	}
 
 	return status
+}
+
+// buildHealthStatus builds health status from health checker
+func (m *Manager) buildHealthStatus() *HealthStatus {
+	healthStatus := m.healthChecker.GetStatus()
+	health := &HealthStatus{
+		Healthy:   healthStatus.Healthy,
+		Timestamp: healthStatus.Timestamp,
+		Checks:    make(map[string]CheckResult),
+	}
+
+	for name, check := range healthStatus.Checks {
+		health.Checks[name] = CheckResult{
+			Name:    check.Name,
+			Healthy: check.Healthy,
+			Error:   check.Error,
+		}
+	}
+
+	return health
 }
 
 // Wait waits for the node to exit
@@ -395,43 +436,31 @@ func (m *Manager) monitor() {
 		return
 	}
 
-	// Wait for process to exit
 	err := cmd.Wait()
-
-	// Reap any zombie child processes
 	go m.reapZombies()
 
 	m.stateMutex.Lock()
 	defer m.stateMutex.Unlock()
 
-	// Check if this was an expected shutdown
 	if m.state == StateStopping {
 		return
 	}
 
-	// Process crashed unexpectedly
+	m.handleProcessCrash(err)
+}
+
+// handleProcessCrash handles unexpected process termination
+func (m *Manager) handleProcessCrash(err error) {
 	m.state = StateCrashed
 	m.logger.Error("node process crashed unexpectedly", zap.Error(err))
 
-	// Close done channel to signal process exit
 	if m.doneCh != nil {
 		close(m.doneCh)
 		m.doneCh = nil
 	}
 
-	// Check if we should auto-restart
-	if m.config.RestartOnFailure && m.restartCount < m.maxRestarts {
-		m.logger.Info("attempting auto-restart",
-			zap.Int("attempt", m.restartCount+1),
-			zap.Int("max", m.maxRestarts))
-
-		go func() {
-			time.Sleep(5 * time.Second) // Wait before restart
-			if err := m.Restart(); err != nil {
-				m.logger.Error("auto-restart failed", zap.Error(err))
-				m.errorCh <- err
-			}
-		}()
+	if m.shouldAutoRestart() {
+		m.scheduleAutoRestart()
 	} else {
 		m.state = StateError
 		if m.restartCount >= m.maxRestarts {
@@ -442,11 +471,30 @@ func (m *Manager) monitor() {
 	}
 }
 
+// shouldAutoRestart returns true if auto-restart should be attempted
+func (m *Manager) shouldAutoRestart() bool {
+	return m.config.RestartOnFailure && m.restartCount < m.maxRestarts
+}
+
+// scheduleAutoRestart schedules an automatic restart
+func (m *Manager) scheduleAutoRestart() {
+	m.logger.Info("attempting auto-restart",
+		zap.Int("attempt", m.restartCount+1),
+		zap.Int("max", m.maxRestarts))
+
+	go func() {
+		time.Sleep(DefaultAutoRestartDelay)
+		if err := m.Restart(); err != nil {
+			m.logger.Error("auto-restart failed", zap.Error(err))
+			m.errorCh <- err
+		}
+	}()
+}
+
 // buildEnvironment builds the environment variables for the node
 func (m *Manager) buildEnvironment() []string {
 	env := os.Environ()
 
-	// Add custom environment variables
 	if m.config.Home != "" {
 		env = append(env, fmt.Sprintf("WEMIX_HOME=%s", m.config.Home))
 	}
@@ -454,7 +502,6 @@ func (m *Manager) buildEnvironment() []string {
 		env = append(env, fmt.Sprintf("WEMIX_NETWORK=%s", m.config.Network))
 	}
 
-	// Add any custom environment variables from config
 	for k, v := range m.config.Environment {
 		env = append(env, fmt.Sprintf("%s=%s", k, v))
 	}
@@ -473,14 +520,12 @@ func (m *Manager) getLogFile() *os.File {
 		logPath = filepath.Join(m.config.Home, logPath)
 	}
 
-	// Ensure log directory exists
 	logDir := filepath.Dir(logPath)
 	if err := os.MkdirAll(logDir, 0755); err != nil {
 		m.logger.Error("failed to create log directory", zap.Error(err))
 		return nil
 	}
 
-	// Open or create log file
 	file, err := os.OpenFile(logPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
 	if err != nil {
 		m.logger.Error("failed to open log file", zap.Error(err))
@@ -494,14 +539,12 @@ func (m *Manager) getLogFile() *os.File {
 func (m *Manager) getBinaryVersion() (string, error) {
 	cmdPath := m.config.CurrentBin()
 	if cmdPath == "" {
-		return "", fmt.Errorf("no binary found")
+		return "", fmt.Errorf("no binary path configured")
 	}
 
-	// Create a context with timeout to prevent hanging
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), DefaultVersionTimeout)
 	defer cancel()
 
-	// Try different version command patterns
 	versionCmds := [][]string{
 		{"version"},
 		{"--version"},
@@ -513,16 +556,13 @@ func (m *Manager) getBinaryVersion() (string, error) {
 		cmd := exec.CommandContext(ctx, cmdPath, args...)
 		output, err := cmd.Output()
 
-		// If command succeeded and returned non-empty output
 		if err == nil && len(output) > 0 {
-			// Trim whitespace and return first line
 			lines := strings.Split(strings.TrimSpace(string(output)), "\n")
 			if len(lines) > 0 && lines[0] != "" {
 				return lines[0], nil
 			}
 		}
 
-		// Check if context timed out
 		if ctx.Err() != nil {
 			return "", fmt.Errorf("timeout getting version: %w", ctx.Err())
 		}
@@ -536,12 +576,10 @@ func (m *Manager) GetVersion() string {
 	m.stateMutex.RLock()
 	defer m.stateMutex.RUnlock()
 
-	// Only get version if running
 	if m.state != StateRunning {
 		return "unknown"
 	}
 
-	// Try to get version (with caching in the future)
 	version, err := m.getBinaryVersion()
 	if err != nil {
 		m.logger.Debug("failed to get binary version", zap.Error(err))
@@ -572,7 +610,6 @@ func (m *Manager) IsHealthy() bool {
 		return false
 	}
 
-	// Check if process is still alive
 	err := m.process.Signal(syscall.Signal(0))
 	return err == nil
 }

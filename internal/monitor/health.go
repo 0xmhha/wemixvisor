@@ -7,9 +7,18 @@ import (
 	"sync"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/wemix/wemixvisor/internal/config"
 	"github.com/wemix/wemixvisor/pkg/logger"
-	"go.uber.org/zap"
+)
+
+// Default values for health checker configuration
+const (
+	DefaultCheckInterval = 30 * time.Second
+	DefaultCheckTimeout  = 5 * time.Second
+	DefaultRPCPort       = 8545
+	DefaultMinPeers      = 1
 )
 
 // HealthStatus represents the overall health status
@@ -42,51 +51,53 @@ type HealthChecker struct {
 	checkInterval time.Duration
 	checks        []HealthCheck
 
-	// Status tracking
-	lastStatus    HealthStatus
-	statusMutex   sync.RWMutex
+	lastStatus  HealthStatus
+	statusMutex sync.RWMutex
 
-	// Context for lifecycle
 	ctx    context.Context
 	cancel context.CancelFunc
 
-	// Channels
-	statusCh chan HealthStatus
-
-	// Stop tracking
+	statusCh  chan HealthStatus
 	stopped   bool
 	stopMutex sync.Mutex
 }
 
 // NewHealthChecker creates a new health checker
-func NewHealthChecker(cfg *config.Config, logger *logger.Logger) *HealthChecker {
+func NewHealthChecker(cfg *config.Config, log *logger.Logger) *HealthChecker {
 	ctx, cancel := context.WithCancel(context.Background())
 
-	checkInterval := 30 * time.Second
+	checkInterval := DefaultCheckInterval
 	if cfg.HealthCheckInterval > 0 {
 		checkInterval = cfg.HealthCheckInterval
 	}
 
-	rpcPort := 8545
+	rpcPort := DefaultRPCPort
 	if cfg.RPCPort > 0 {
 		rpcPort = cfg.RPCPort
 	}
 
+	rpcURL := fmt.Sprintf("http://localhost:%d", rpcPort)
+
 	return &HealthChecker{
 		config:        cfg,
-		logger:        logger,
-		httpClient:    &http.Client{Timeout: 5 * time.Second},
-		rpcURL:        fmt.Sprintf("http://localhost:%d", rpcPort),
+		logger:        log,
+		httpClient:    &http.Client{Timeout: DefaultCheckTimeout},
+		rpcURL:        rpcURL,
 		checkInterval: checkInterval,
-		ctx:          ctx,
-		cancel:       cancel,
-		statusCh:     make(chan HealthStatus, 1),
-		checks: []HealthCheck{
-			&ProcessCheck{},
-			&RPCHealthCheck{url: fmt.Sprintf("http://localhost:%d", rpcPort)},
-			&PeerCountCheck{minPeers: 1, rpcURL: fmt.Sprintf("http://localhost:%d", rpcPort)},
-			&SyncingCheck{rpcURL: fmt.Sprintf("http://localhost:%d", rpcPort)},
-		},
+		ctx:           ctx,
+		cancel:        cancel,
+		statusCh:      make(chan HealthStatus, 1),
+		checks:        createDefaultChecks(rpcURL),
+	}
+}
+
+// createDefaultChecks creates the default health checks
+func createDefaultChecks(rpcURL string) []HealthCheck {
+	return []HealthCheck{
+		&ProcessCheck{},
+		&RPCHealthCheck{url: rpcURL},
+		&PeerCountCheck{minPeers: DefaultMinPeers, rpcURL: rpcURL},
+		&SyncingCheck{rpcURL: rpcURL},
 	}
 }
 
@@ -103,23 +114,14 @@ func (h *HealthChecker) Stop() {
 	h.stopMutex.Unlock()
 
 	h.cancel()
-	// Don't close the channel here, let the goroutine handle it
 }
 
 // run is the main monitoring loop
 func (h *HealthChecker) run() {
 	ticker := time.NewTicker(h.checkInterval)
 	defer ticker.Stop()
-	defer func() {
-		// Close channel only if not already stopped
-		h.stopMutex.Lock()
-		if !h.stopped {
-			close(h.statusCh)
-		}
-		h.stopMutex.Unlock()
-	}()
+	defer h.cleanupOnExit()
 
-	// Perform initial check immediately
 	h.performChecks()
 
 	for {
@@ -132,6 +134,15 @@ func (h *HealthChecker) run() {
 	}
 }
 
+// cleanupOnExit handles cleanup when the monitoring loop exits
+func (h *HealthChecker) cleanupOnExit() {
+	h.stopMutex.Lock()
+	if !h.stopped {
+		close(h.statusCh)
+	}
+	h.stopMutex.Unlock()
+}
+
 // performChecks performs all health checks
 func (h *HealthChecker) performChecks() {
 	status := HealthStatus{
@@ -141,45 +152,61 @@ func (h *HealthChecker) performChecks() {
 	}
 
 	for _, check := range h.checks {
-		result := CheckResult{
-			Name: check.Name(),
-		}
-
-		// Create context with timeout for individual check
-		ctx, cancel := context.WithTimeout(h.ctx, 5*time.Second)
-
-		if err := check.Check(ctx); err != nil {
-			result.Healthy = false
-			result.Error = err.Error()
-			status.Healthy = false
-			h.logger.Warn("health check failed",
-				zap.String("check", check.Name()),
-				zap.Error(err))
-		} else {
-			result.Healthy = true
-			h.logger.Debug("health check passed",
-				zap.String("check", check.Name()))
-		}
-
-		cancel()
+		result := h.executeCheck(check)
 		status.Checks[check.Name()] = result
+
+		if !result.Healthy {
+			status.Healthy = false
+		}
 	}
 
-	// Update status
+	h.updateStatus(status)
+	h.sendStatusUpdate(status)
+}
+
+// executeCheck executes a single health check with timeout
+func (h *HealthChecker) executeCheck(check HealthCheck) CheckResult {
+	result := CheckResult{Name: check.Name()}
+
+	ctx, cancel := context.WithTimeout(h.ctx, DefaultCheckTimeout)
+	defer cancel()
+
+	if err := check.Check(ctx); err != nil {
+		result.Healthy = false
+		result.Error = err.Error()
+		h.logger.Warn("health check failed",
+			zap.String("check", check.Name()),
+			zap.Error(err))
+	} else {
+		result.Healthy = true
+		h.logger.Debug("health check passed",
+			zap.String("check", check.Name()))
+	}
+
+	return result
+}
+
+// updateStatus updates the cached health status
+func (h *HealthChecker) updateStatus(status HealthStatus) {
 	h.statusMutex.Lock()
 	h.lastStatus = status
 	h.statusMutex.Unlock()
+}
 
-	// Send status update (non-blocking)
+// sendStatusUpdate sends status update to the channel (non-blocking)
+func (h *HealthChecker) sendStatusUpdate(status HealthStatus) {
 	h.stopMutex.Lock()
-	if !h.stopped {
-		select {
-		case h.statusCh <- status:
-		default:
-			// Channel full, skip this update
-		}
+	defer h.stopMutex.Unlock()
+
+	if h.stopped {
+		return
 	}
-	h.stopMutex.Unlock()
+
+	select {
+	case h.statusCh <- status:
+	default:
+		// Channel full, skip this update
+	}
 }
 
 // GetStatus returns the last health status

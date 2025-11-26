@@ -8,78 +8,153 @@ Wemixvisor is inspired by Cosmos SDK's Cosmovisor and adapted specifically for W
 
 ## Features
 
-### Phase 1: MVP (v0.1.0) - Complete
-- Automatic binary upgrade detection
-- Process lifecycle management
-- File-based upgrade monitoring
-- Symbolic link-based version switching
-- Signal handling (SIGTERM, SIGINT, SIGQUIT)
-- Configurable polling intervals
-- Environment variable configuration
-
-### Phase 2: Core Features (v0.2.0) - Complete
-- Data backup before upgrades
-- Pre-upgrade hooks and validation
-- Graceful shutdown with timeout
-- Backup restoration on failure
-- Custom pre-upgrade scripts
-- Enhanced error handling
-
-### Phase 3: Advanced Features (v0.3.0) - Complete
-- Automatic binary downloads with SHA256/SHA512 checksum verification
-- Batch upgrade support with plan management
-- WBFT consensus integration for coordinated upgrades
-- Validator-specific upgrade coordination
-- Height-based upgrade scheduling
-- Progress reporting for downloads
-- Retry mechanism with exponential backoff
-
-### Phase 4: Node Lifecycle Management (v0.4.0) - Complete
-- Enhanced node process lifecycle management
-- Robust start/stop/restart operations with state machine
-- Graceful shutdown with configurable timeout (SIGTERM → SIGKILL)
-- Auto-restart mechanism with configurable max limits
-- Process group management and zombie prevention
-- Real-time health monitoring and PID tracking
-- Binary version detection with multiple command patterns
-- Thread-safe concurrent operations
-- Comprehensive error handling and recovery
-
-### Phase 7: Advanced Monitoring and Management (v0.7.0) - Complete
-- Real-time metrics collection and Prometheus integration
-- WebSocket-based API server with real-time updates
-- Comprehensive alerting system with multi-channel notifications
-- Advanced performance profiling (CPU, memory, goroutine)
-- Resource optimization with caching and connection pooling
-- Structured logging with multiple output targets
-- RESTful API endpoints for programmatic control
-- Performance overhead < 1%
-
-### Phase 8: Upgrade Automation (v0.8.0) - Complete
-- Automatic blockchain height monitoring via RPC
-- Height-based upgrade orchestration and triggering
-- CLI commands for upgrade scheduling and management
-- File-based upgrade configuration (upgrade-info.json)
-- Automatic upgrade execution at configured heights
-- Rollback mechanism on upgrade failures
-- Real-time upgrade status reporting
-- Zero manual intervention required
-- Comprehensive integration testing
+- **Automatic Upgrade Detection** - Monitors for upgrade triggers and executes seamlessly
+- **Height-Based Upgrade Scheduling** - Schedule upgrades at specific blockchain heights
+- **Zero Manual Intervention** - Automatic execution when blockchain reaches target height
+- **Automatic Binary Downloads** - Download binaries with SHA256/SHA512 checksum verification
+- **Data Backup & Rollback** - Automatic backup before upgrades with rollback on failure
+- **Process Lifecycle Management** - Robust start/stop/restart with auto-restart capability
+- **Health Monitoring** - Real-time health checks and metrics collection
+- **Graceful Shutdown** - Configurable timeout with SIGTERM → SIGKILL escalation
+- **WBFT Consensus Integration** - Coordinated upgrades across validator network
 
 ## Installation
 
 ### From Source
 
 ```bash
-# Clone the repository
 git clone https://github.com/wemix/wemixvisor.git
 cd wemixvisor
-
-# Build the binary
 make build
+make install
+```
+
+## Development
+
+### Requirements
+
+- Go 1.23 or higher
+- Make
+- (Optional) golangci-lint for linting
+- (Optional) Docker for container builds
+
+### Build Commands
+
+```bash
+# Build for current platform
+make build
+
+# Build for all platforms (Linux, macOS, Windows)
+make build-all
+
+# Build for specific platform
+make build-linux
+make build-darwin
+make build-windows
 
 # Install to $GOPATH/bin
 make install
+
+# Clean build artifacts
+make clean
+```
+
+### Test Commands
+
+```bash
+# Run unit tests (default)
+make test
+
+# Run unit tests with race detector
+make test-unit
+
+# Run integration tests
+make test-integration
+
+# Run end-to-end tests
+make test-e2e
+
+# Run all tests
+make test-all
+
+# Run tests with verbose output
+make test-verbose
+```
+
+### Code Coverage
+
+```bash
+# Generate coverage report
+make coverage
+
+# Generate HTML coverage report
+make coverage-html
+
+# Show function-level coverage
+make coverage-func
+```
+
+### Code Quality
+
+```bash
+# Format code
+make fmt
+
+# Run go vet
+make vet
+
+# Run linter (requires golangci-lint)
+make lint
+
+# Run all quality checks
+make check
+```
+
+### Dependencies
+
+```bash
+# Download dependencies
+make deps
+
+# Update dependencies
+make deps-update
+
+# Tidy dependencies
+make deps-tidy
+```
+
+### Docker
+
+```bash
+# Build Docker image
+make docker-build
+
+# Push Docker image
+make docker-push
+```
+
+### Release
+
+```bash
+# Prepare release (clean, check, test, build all platforms)
+make release
+
+# Generate release notes
+make release-notes
+```
+
+### Useful Commands
+
+```bash
+# Show all available make targets
+make help
+
+# Show version and build information
+make version
+make info
+
+# Build and run help (development mode)
+make dev
 ```
 
 ## Quick Start
@@ -100,7 +175,7 @@ wemixvisor init /path/to/wemixd
 wemixvisor run start
 ```
 
-## Upgrade Management (Phase 8)
+## Upgrade Management
 
 ### Schedule an Upgrade
 
@@ -118,15 +193,11 @@ wemixvisor upgrade schedule v1.2.0 1000000 \
 
 ### Check Upgrade Status
 
-View currently scheduled upgrade:
-
 ```bash
 wemixvisor upgrade status
 ```
 
 ### Cancel Scheduled Upgrade
-
-Cancel a pending upgrade:
 
 ```bash
 wemixvisor upgrade cancel
@@ -137,11 +208,10 @@ wemixvisor upgrade cancel --force
 
 ### How It Works
 
-1. **Height Monitoring**: Wemixvisor continuously monitors blockchain height via RPC
-2. **Automatic Trigger**: When the blockchain reaches the scheduled height, upgrade executes automatically
-3. **Safe Execution**: Node stops gracefully → binary switches → node restarts with new binary
-4. **Rollback**: Automatic rollback to previous binary if upgrade fails
-5. **Zero Downtime**: Coordinated upgrades across validator network minimize downtime
+1. **Height Monitoring** - Continuously monitors blockchain height via RPC
+2. **Automatic Trigger** - Executes upgrade when blockchain reaches scheduled height
+3. **Safe Execution** - Node stops gracefully → binary switches → node restarts
+4. **Rollback** - Automatic rollback to previous binary if upgrade fails
 
 ## Configuration
 
@@ -162,13 +232,13 @@ wemixvisor upgrade cancel --force
 | `DAEMON_RPC_ADDRESS` | `localhost:8545` | RPC address for WBFT node |
 | `VALIDATOR_MODE` | `false` | Enable validator-specific features |
 | `DAEMON_ALLOW_DOWNLOAD_BINARIES` | `false` | Allow automatic binary downloads |
-| `UNSAFE_SKIP_CHECKSUM` | `false` | Skip checksum verification for downloads |
+| `UNSAFE_SKIP_CHECKSUM` | `false` | Skip checksum verification |
 | `DAEMON_RESTART_ON_FAILURE` | `true` | Auto-restart on process failure |
 | `DAEMON_MAX_RESTARTS` | `5` | Maximum auto-restart attempts |
 | `DAEMON_HEALTH_CHECK_INTERVAL` | `30s` | Health check interval |
 | `DAEMON_LOG_FILE` | - | Log file path for node output |
-| `DAEMON_UPGRADE_ENABLED` | `true` | Enable automatic upgrade monitoring (Phase 8) |
-| `DAEMON_HEIGHT_POLL_INTERVAL` | `5s` | Blockchain height polling interval (Phase 8) |
+| `DAEMON_UPGRADE_ENABLED` | `true` | Enable automatic upgrade monitoring |
+| `DAEMON_HEIGHT_POLL_INTERVAL` | `5s` | Blockchain height polling interval |
 
 ### Directory Structure
 
@@ -179,19 +249,14 @@ $DAEMON_HOME/
 │   ├── genesis/           # Initial binary
 │   │   └── bin/
 │   │       └── wemixd
-│   ├── upgrades/          # Upgrade binaries
-│   │   └── v2.0.0/
-│   │       ├── bin/
-│   │       │   └── wemixd
-│   │       └── pre-upgrade  # Optional pre-upgrade script
-│   └── plans/             # Batch upgrade plans (v0.3.0+)
-│       └── q4-2025-20250926-140530.json
+│   └── upgrades/          # Upgrade binaries
+│       └── v2.0.0/
+│           ├── bin/
+│           │   └── wemixd
+│           └── pre-upgrade  # Optional pre-upgrade script
 ├── data/
-│   ├── upgrade-info.json  # Upgrade trigger file
-│   └── upgrades/          # Height-based upgrade info (v0.3.0+)
-│       └── 1000000/
-│           └── upgrade-info.json
-└── backups/               # Data backups (v0.2.0+)
+│   └── upgrade-info.json  # Upgrade trigger file
+└── backups/               # Data backups
 ```
 
 ### Upgrade Info Format
@@ -211,353 +276,60 @@ Create `$DAEMON_HOME/data/upgrade-info.json` to trigger an upgrade:
 }
 ```
 
-## CLI Commands (Phase 4)
+## CLI Commands
 
-Wemixvisor provides a comprehensive CLI for node lifecycle management:
-
-### Basic Commands
+### Node Management
 
 ```bash
-# Initialize wemixvisor directory structure and configuration
+# Initialize directory structure
 wemixvisor init
 
-# Start the node (in background by default)
+# Start the node (background)
 wemixvisor start [node-args...]
 
 # Stop the running node
 wemixvisor stop
 
-# Restart the node with optional new arguments
+# Restart the node
 wemixvisor restart [node-args...]
-
-# Show detailed node status
-wemixvisor status [--json]
-
-# Display version information
-wemixvisor version
 
 # Run node in foreground
 wemixvisor run [node-args...]
 ```
 
-### Status and Health Monitoring
-
-The `status` command provides comprehensive node health information:
+### Status & Monitoring
 
 ```bash
 # Human-readable status
 wemixvisor status
 
-# JSON output with health metrics
+# JSON output
 wemixvisor status --json
+
+# Version information
+wemixvisor version
 ```
 
-Sample JSON output:
+### Sample Status Output
+
 ```json
 {
   "state": "running",
-  "state_string": "running",
   "pid": 12345,
   "uptime": "2h30m45s",
   "restart_count": 0,
-  "network": "mainnet",
   "binary": "/path/to/current/bin/wemixd",
   "version": "v1.2.3",
   "health": {
     "healthy": true,
-    "timestamp": "2025-09-29T12:00:00Z",
     "checks": {
-      "process": {"name": "process", "healthy": true, "error": ""},
-      "rpc_endpoint": {"name": "rpc_endpoint", "healthy": true, "error": ""},
-      "memory": {"name": "memory", "healthy": true, "error": ""}
+      "process": {"healthy": true},
+      "rpc_endpoint": {"healthy": true},
+      "memory": {"healthy": true}
     }
   }
 }
 ```
-
-### Health Monitoring Features
-
-- **Process Health**: Monitors node process liveness
-- **RPC Endpoint**: Checks JSON-RPC connectivity
-- **Memory Usage**: Tracks memory consumption
-- **Disk Space**: Validates available storage
-- **Network Connectivity**: Verifies peer connections
-- **Sync Status**: Monitors blockchain synchronization
-
-### Metrics Collection
-
-Wemixvisor automatically collects and provides metrics:
-
-- Node uptime and restart count
-- Memory usage in megabytes
-- Health status and check results
-- JSON and Prometheus export formats
-
-## Development
-
-### Building
-
-All build artifacts are centralized in the `dist/` directory:
-
-```bash
-# Build binary (output: dist/bin/wemixvisor)
-make build
-
-# Build for all platforms
-make build-all
-
-# Clean all build artifacts
-make clean
-
-# Deep clean (includes caches)
-make clean-all
-
-# View build information
-make info
-```
-
-**Build Output Structure:**
-```
-dist/
-├── bin/              # Binary executables
-├── coverage/         # Coverage reports
-├── reports/          # Test reports
-├── profiles/         # Performance profiles
-└── scripts-output/   # Script execution logs
-```
-
-### Code Quality
-
-```bash
-# Format code
-make fmt
-
-# Run linter
-make lint
-
-# Run go vet
-make vet
-
-# Run all checks
-make check
-```
-
-### Testing
-
-#### Running All Tests
-
-```bash
-# Run all tests with verbose output
-go test -v ./...
-
-# Run tests with coverage report
-go test -v -cover ./...
-
-# Generate coverage report with HTML output
-go test -coverprofile=coverage.out ./...
-go tool cover -html=coverage.out -o coverage.html
-
-# Run tests with race detection
-go test -race ./...
-```
-
-#### Running Specific Test Categories
-
-```bash
-# Unit tests only (fast)
-go test -short ./...
-
-# Integration tests
-go test -v ./internal/... ./pkg/...
-
-# E2E tests (requires build tag)
-go test -tags=e2e -v ./test/e2e
-
-# Benchmark tests
-go test -bench=. -benchmem ./...
-
-# Specific package tests
-go test -v ./internal/monitor
-go test -v ./internal/metrics
-go test -v ./internal/cli
-```
-
-#### Test Coverage by Package
-
-```bash
-# Check coverage for specific packages
-go test -cover ./internal/monitor
-go test -cover ./internal/metrics
-go test -cover ./internal/cli
-go test -cover ./internal/node
-
-# Detailed coverage breakdown
-go test -coverprofile=coverage.out -covermode=atomic ./...
-go tool cover -func=coverage.out
-```
-
-#### Testing Phase 4 Features
-
-```bash
-# Test health monitoring
-go test -v ./internal/monitor/...
-
-# Test metrics collection
-go test -v ./internal/metrics/...
-
-# Test CLI commands
-go test -v ./internal/cli/...
-
-# Test node management
-go test -v ./internal/node/...
-
-# Run Phase 4 E2E tests
-go test -tags=e2e -v ./test/e2e -run TestPhase4
-```
-
-#### Performance Testing
-
-```bash
-# Run all benchmarks
-go test -bench=. -benchmem ./...
-
-# Run specific benchmark tests
-go test -bench=BenchmarkHealthChecker ./internal/monitor
-go test -bench=BenchmarkMetricsCollector ./internal/metrics
-go test -bench=BenchmarkParser ./internal/cli
-
-# Run benchmarks with CPU profiling
-go test -bench=. -cpuprofile=cpu.prof ./internal/monitor
-go tool pprof cpu.prof
-
-# Run benchmarks with memory profiling
-go test -bench=. -memprofile=mem.prof ./internal/monitor
-go tool pprof mem.prof
-```
-
-#### Test Environment Setup
-
-```bash
-# Set test environment variables
-export DAEMON_HOME=$HOME/.wemixd-test
-export DAEMON_NAME=wemixd
-export DAEMON_HEALTH_CHECK_INTERVAL=1s
-export DAEMON_METRICS_INTERVAL=5s
-
-# Clean test artifacts
-rm -rf $DAEMON_HOME
-rm -f coverage.out coverage.html
-rm -f *.prof
-```
-
-#### Continuous Integration Testing
-
-```bash
-# Run full CI test suite
-make ci-test
-
-# Or manually:
-go fmt ./...
-go vet ./...
-golangci-lint run
-go test -race -coverprofile=coverage.out ./...
-go test -tags=e2e ./test/e2e
-```
-
-#### Troubleshooting Tests
-
-If tests fail or hang:
-
-1. **Check test timeouts**: Some tests may need longer timeouts
-   ```bash
-   go test -timeout 30s ./...
-   ```
-
-2. **Run tests sequentially**: Avoid parallel test conflicts
-   ```bash
-   go test -p 1 ./...
-   ```
-
-3. **Enable verbose logging**: See detailed test output
-   ```bash
-   go test -v -count=1 ./...
-   ```
-
-4. **Clean test cache**: Force fresh test runs
-   ```bash
-   go clean -testcache
-   go test ./...
-   ```
-
-### Project Structure
-
-```
-wemixvisor/
-├── cmd/              # CLI commands
-├── internal/         # Private packages
-│   ├── backup/       # Data backup functionality
-│   ├── batch/        # Batch upgrade management
-│   ├── commands/     # Command implementations
-│   ├── config/       # Configuration management
-│   ├── download/     # Automatic binary downloads
-│   ├── hooks/        # Pre-upgrade hooks
-│   ├── node/         # Node lifecycle management (Phase 4)
-│   ├── process/      # Process management
-│   ├── upgrade/      # Upgrade handling
-│   └── wbft/         # WBFT consensus integration
-├── pkg/              # Public packages
-│   ├── logger/       # Logging utilities
-│   └── types/        # Common types
-├── docs/             # Documentation
-├── scripts/          # Utility scripts (tests, setup)
-├── test/             # Integration tests
-└── dist/             # Build artifacts (generated)
-```
-
-## Documentation
-
-### Implementation Guides
-- [Phase 4: Node Lifecycle](./docs/phase4-detailed-implementation.md) - Detailed implementation guide
-- [Phase 7: Advanced Features](./docs/phase7-advanced-features.md) - Metrics, API, optimization
-- [Phase 7 User Guide](./docs/phase7-user-guide.md) - Using advanced features
-
-### Feature Documentation
-- [Metrics & Monitoring](./docs/metrics.md) - Metrics collection and Prometheus integration
-- [Alerting System](./docs/alerting.md) - Alert rules and notification channels
-- [Grafana Dashboards](./docs/grafana.md) - Dashboard setup and configuration
-- [Testing Guide](./docs/testing.md) - Testing strategy and coverage
-
-### API References
-- [Governance API](./docs/governance-api.md) - Governance integration API
-- [Governance Overview](./docs/governance.md) - Governance system overview
-
-### Project Management
-- [Roadmap](./docs/ROADMAP.md) - Development roadmap and milestones
-- [Changes Log](./CHANGES.md) - Version history and release notes
-
-## Development Status
-
-- ✅ Phase 1: Basic process management (v0.1.0) - Complete
-- ✅ Phase 2: Core features (v0.2.0) - Complete
-- ✅ Phase 3: Advanced features & WBFT integration (v0.3.0) - Complete
-- ✅ Phase 4: Node lifecycle management (v0.4.0) - Complete
-  - Enhanced process lifecycle with state machine
-  - Auto-restart with configurable limits
-  - Health monitoring and version detection
-  - 91.2% test coverage achieved
-- ✅ Phase 5: Configuration management system (v0.5.0) - Complete
-- ✅ Phase 6: Governance integration (v0.6.0) - Complete
-- ✅ Phase 7: Advanced features & optimization (v0.7.0) - Complete
-  - Metrics collection and Prometheus exporter
-  - RESTful API server with WebSocket support
-  - Alerting system with multiple notification channels
-  - Performance profiling and optimization tools
-- ✅ Phase 8: Upgrade Automation (v0.8.0) - Complete
-  - Automatic blockchain height monitoring
-  - Height-based upgrade orchestration
-  - CLI commands for upgrade management
-  - Zero manual intervention upgrades
-  - 78-100% test coverage achieved
 
 ## Contributing
 
